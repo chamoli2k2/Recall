@@ -13,6 +13,7 @@ A collaborative flashcard application built with **React, Express, and MongoDB**
 - Global discovery, public profiles, anonymous public-card viewing, saved collections, and private copies.
 - A public home page at `/` for signed-out visitors: interactive sample card, how-it-works, live public collections, and clear sign-in/sign-up paths (`/login`, `/signup`). Anonymous visitors can read and flip public cards but cannot create, edit, save, or copy — the API enforces this, not just the UI.
 - FSRS spaced repetition (the algorithm behind modern Anki) with a per-learner desired-retention setting, interval previews on the rating buttons, and retention analytics: predicted vs observed recall, a 14-day due forecast, memory-state distribution, and your hardest cards. See [Spaced repetition](#spaced-repetition-fsrs).
+- Study habit dashboard: a GitHub-style activity heatmap (26 weeks, shaded by reviews per UTC day), current and longest streaks, study-day count, a 30-day rating mix, and generated insights such as the hour of day you remember best and your busiest weekday. Computed with MongoDB aggregation pipelines over the review log.
 - Quick review, due-card study, daily goals, personal progress, and keyboard shortcuts.
 - Archive and restore folders; confirmed permanent deletion of individual cards.
 - Permission-checked image delivery. Images are decoded, resized, stripped of metadata, and stored in MongoDB.

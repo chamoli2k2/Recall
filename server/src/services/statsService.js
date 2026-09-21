@@ -41,6 +41,48 @@ export async function studyStats(user, now = new Date()) {
   return {
     totalCards: cards.length, due, reviewed, reviewsToday, mastered: progress.filter(p => (p.stability || p.interval) >= 21).length, goal: user.dailyGoal,
     retention: { desired: user.desiredRetention || DEFAULT_RETENTION, predicted: predictedRetention, observed: observedRetention, sampled: graded.length, averageStability: Math.round(avgStability * 10) / 10 },
-    forecast, states, hardest
+    forecast, states, hardest, ...(await studyHabits(user, now))
   };
+}
+/**
+ * Streaks over a set of 'YYYY-MM-DD' UTC study days. The current streak counts back from today, or from yesterday when
+ * today has no review yet (so a streak is not "broken" until the day actually ends). Pure, for unit testing.
+ */
+export function computeStreaks(studied, now = new Date()) {
+  const key = d => d.toISOString().slice(0, 10); const today = startOfUtcDay(now);
+  const from = studied.has(key(today)) ? today : new Date(today.getTime() - DAY);
+  let current = 0; for (let d = from; studied.has(key(d)); d = new Date(d.getTime() - DAY)) current++;
+  let longest = 0, run = 0, prev = null;
+  for (const d of [...studied].sort()) { const t = new Date(d + 'T00:00:00Z').getTime(); run = prev != null && t - prev === DAY ? run + 1 : 1; prev = t; longest = Math.max(longest, run); }
+  return { current, longest };
+}
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const hourLabel = h => `${h % 12 || 12}${h < 12 ? 'am' : 'pm'}`;
+/**
+ * Habit analytics from the review log: a one-year daily heatmap, current and longest streaks, and insights about when
+ * the learner studies and remembers best. Aggregated in MongoDB and bucketed by UTC day, which matches the daily goal.
+ */
+export async function studyHabits(user, now = new Date(), days = 365) {
+  const since = new Date(startOfUtcDay(now).getTime() - (days - 1) * DAY);
+  const [daily, hours, weekdays, ratings, everyDay] = await Promise.all([
+    Review.aggregate([{ $match: { user: user._id, createdAt: { $gte: since } } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 }, recalled: { $sum: { $cond: [{ $eq: ['$rating', 'again'] }, 0, 1] } } } }, { $sort: { _id: 1 } }]),
+    Review.aggregate([{ $match: { user: user._id } }, { $group: { _id: { $hour: '$createdAt' }, count: { $sum: 1 }, recalled: { $sum: { $cond: [{ $eq: ['$rating', 'again'] }, 0, 1] } } } }]),
+    Review.aggregate([{ $match: { user: user._id } }, { $group: { _id: { $dayOfWeek: '$createdAt' }, count: { $sum: 1 } } }]),
+    Review.aggregate([{ $match: { user: user._id, createdAt: { $gte: new Date(now - 30 * DAY) } } }, { $group: { _id: '$rating', count: { $sum: 1 } } }]),
+    Review.aggregate([{ $match: { user: user._id } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } } }, { $sort: { _id: -1 } }])
+  ]);
+  const heatmap = daily.map(d => ({ date: d._id, count: d.count, recalled: d.recalled }));
+  const studied = new Set(everyDay.map(d => d._id)); const { current, longest } = computeStreaks(studied, now);
+  const totalReviews = hours.reduce((a, h) => a + h.count, 0);
+  const bestHour = hours.filter(h => h.count >= 5).sort((a, b) => b.recalled / b.count - a.recalled / a.count || b.count - a.count)[0];
+  const busiestHour = [...hours].sort((a, b) => b.count - a.count)[0];
+  const busiestDay = [...weekdays].sort((a, b) => b.count - a.count)[0];
+  const insights = [];
+  if (bestHour) insights.push({ icon: 'sun', text: `You remember best around ${hourLabel(bestHour._id)} UTC: ${Math.round(bestHour.recalled / bestHour.count * 100)}% recall across ${bestHour.count} reviews.` });
+  if (busiestHour && (!bestHour || busiestHour._id !== bestHour._id)) insights.push({ icon: 'clock', text: `Most of your studying happens around ${hourLabel(busiestHour._id)} UTC.` });
+  if (busiestDay && weekdays.length > 1) insights.push({ icon: 'calendar', text: `${WEEKDAYS[busiestDay._id - 1]} is your busiest study day (${Math.round(busiestDay.count / totalReviews * 100)}% of all reviews).` });
+  if (studied.size >= 7) insights.push({ icon: 'trend', text: `You average ${Math.round(totalReviews / studied.size)} reviews on the days you study, across ${studied.size} study days.` });
+  if (current >= 3) insights.push({ icon: 'flame', text: `${current}-day streak. Reviewing even one card today keeps it alive.` });
+  const ratingMix = Object.fromEntries(['again', 'hard', 'good', 'easy'].map(r => [r, ratings.find(x => x._id === r)?.count || 0]));
+  return { heatmap, streak: { current, longest, activeDays: studied.size, since: since.toISOString().slice(0, 10) }, insights, ratingMix };
 }

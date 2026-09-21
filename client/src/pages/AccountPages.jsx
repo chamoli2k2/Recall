@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Check, Layers, Target, BookOpen, GraduationCap, LockKeyhole } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Layers, Target, BookOpen, GraduationCap, LockKeyhole, Flame, Trophy, CalendarDays, Sun, Clock, TrendingUp, Sparkles } from 'lucide-react';
+import Heatmap from '../components/Heatmap';
 import { toast } from 'sonner';
 import { useApp, useLoad } from '../hooks/useApp';
 import { api } from '../services/api';
@@ -19,7 +20,20 @@ export function ProgressPage() {
   const { revision } = useApp(); const { data, loading, error } = useLoad(() => api('/stats'), [revision]);
   if (loading) return <Loading/>; if (error) return <ErrorState message={error}/>; const s = data.stats;
   return <><div className="page-heading"><div><div className="eyebrow">EVERY REVIEW COUNTS</div><h1>Look how far you’re going.</h1><p>Build your knowledge, one small session at a time.</p></div></div><div className="stats-grid">{[[Layers, 'Cards in your library', s.totalCards], [BookOpen, 'Reviews completed', s.reviewed], [Target, 'Ready to review', s.due], [GraduationCap, 'Long-term cards', s.mastered]].map(([Icon, label, value]) => <div className="stat-card" key={label}><span><Icon size={22}/></span><strong>{value}</strong><p>{label}</p></div>)}</div><div className="progress-panel"><div><span className="eyebrow">TODAY’S MOMENTUM</span><h2>{s.reviewsToday >= s.goal ? 'Daily goal, done.' : 'A little time for a lasting habit.'}</h2><p>{s.reviewsToday} of {s.goal} cards reviewed today. Daily totals reset at midnight UTC.</p><div className="goal-progress"><span style={{ width: `${Math.min(100, s.reviewsToday / s.goal * 100)}%` }}/></div><Link to="/" className="button primary">Back to your library <ArrowRight size={17}/></Link></div><div className="progress-insight"><h3>Give your memory some space.</h3><p>Recall schedules with FSRS, the algorithm behind modern Anki. Each card has a <em>stability</em> (how long a memory lasts) and a <em>difficulty</em>; the next review lands just before your recall probability would fall under your desired retention.</p></div></div>
+    {s.heatmap && <HabitsPanel stats={s}/>}
     {s.retention && <RetentionPanel stats={s}/>}</>;
+}
+const INSIGHT_ICONS = { sun: Sun, clock: Clock, calendar: CalendarDays, trend: TrendingUp, flame: Flame };
+function HabitsPanel({ stats: s }) {
+  const mix = s.ratingMix || {}; const mixTotal = Object.values(mix).reduce((a, b) => a + b, 0);
+  return <section className="habits-panel">
+    <div className="habits-head"><div><span className="eyebrow">YOUR STUDY HABIT</span><h2>{s.streak.current ? `${s.streak.current}-day streak.` : s.streak.activeDays ? 'Pick the streak back up.' : 'Every habit starts with a first day.'}</h2></div><div className="streak-badges"><span className={`streak-badge ${s.streak.current ? 'active' : ''}`}><Flame size={16}/><strong>{s.streak.current}</strong> current</span><span className="streak-badge"><Trophy size={16}/><strong>{s.streak.longest}</strong> longest</span><span className="streak-badge"><CalendarDays size={16}/><strong>{s.streak.activeDays}</strong> study days</span></div></div>
+    <Heatmap data={s.heatmap}/>
+    <div className="habits-grid">
+      <div className="retention-card"><span className="eyebrow">INSIGHTS</span>{!s.insights.length ? <p>Study for a few days and Recall will notice when you learn best and how consistently you show up.</p> : <ul className="insight-list">{s.insights.map((i, n) => { const Icon = INSIGHT_ICONS[i.icon] || Sparkles; return <li key={n}><span className="insight-icon"><Icon size={15}/></span>{i.text}</li>; })}</ul>}</div>
+      <div className="retention-card"><span className="eyebrow">LAST 30 DAYS · HOW IT FELT</span>{!mixTotal ? <p>No reviews in the last 30 days yet.</p> : <><div className="state-bar" role="img" aria-label={Object.entries(mix).map(([k, v]) => `${k}: ${v}`).join(', ')}>{['again', 'hard', 'good', 'easy'].map(k => mix[k] > 0 && <span key={k} className={`mix-${k}`} style={{ flex: mix[k] }}/>)}</div><ul className="state-legend">{[['again', 'Again'], ['hard', 'Hard'], ['good', 'Good'], ['easy', 'Easy']].map(([k, label]) => <li key={k}><span className={`state-dot mix-${k}`}/><strong>{mix[k]}</strong> {label} <small>{Math.round(mix[k] / mixTotal * 100)}%</small></li>)}</ul><p>{mix.again / mixTotal > 0.2 ? 'More than a fifth of reviews were forgotten. That is normal for new material; the scheduler is already shortening those intervals.' : 'A healthy mix. Most of what you review, you remember.'}</p></>}</div>
+    </div>
+  </section>;
 }
 const pct = v => v == null ? '—' : `${Math.round(v * 100)}%`;
 function RetentionPanel({ stats: s }) {

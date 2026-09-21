@@ -30,7 +30,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | GET | `/cards/:id/revisions` | Editor/owner |
 | PATCH | `/cards/:id/bookmark` | Reader; own bookmarked boolean |
 | POST | `/reviews` | Reader; cardId, rating, requestId UUID, progress version |
-| GET | `/stats` | Own study statistics: totals, `retention { desired, predicted, observed, sampled, averageStability }`, 14-day `forecast`, memory `states`, `hardest` cards |
+| GET | `/stats` | Own study statistics: totals, `retention { desired, predicted, observed, sampled, averageStability }`, 14-day `forecast`, memory `states`, `hardest` cards, one-year daily `heatmap`, `streak { current, longest, activeDays }`, `insights[]`, 30-day `ratingMix` |
 | GET | `/health` | Liveness: Express is running. Public, no database access, always 200 |
 | GET | `/ready` | Readiness: MongoDB answers a ping within `READINESS_TIMEOUT_MS`. 200 ready / 503 unavailable; no error details |
 
