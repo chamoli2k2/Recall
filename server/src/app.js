@@ -14,7 +14,11 @@ export function createApp() {
   app.use(helmet({ contentSecurityPolicy: { directives: { "img-src": ["'self'", 'blob:', 'data:'], "script-src": ["'self'"], "style-src": ["'self'", "'unsafe-inline'"], "connect-src": ["'self'", ...origins] } } }));
   app.use(cors({ origin: origins, credentials: true }));
   app.use('/api', rateLimit({ windowMs: 60000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false }));
-  app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && ((req.headers.origin && !origins.includes(req.headers.origin)) || req.headers['sec-fetch-site'] === 'cross-site')) return res.status(403).json({ error: 'Request origin is not allowed.' }); next(); });
+  // CSRF guard for writes. Same-origin requests (Origin host === Host header) are always allowed, so the standard
+  // single-service deployment needs no CLIENT_ORIGIN; the allow-list is for separately hosted frontends.
+  const sameOrigin = req => { try { return req.headers.origin && new URL(req.headers.origin).host === req.headers.host; } catch { return false; } };
+  const trustedOrigin = req => !req.headers.origin || origins.includes(req.headers.origin) || sameOrigin(req);
+  app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && (!trustedOrigin(req) || req.headers['sec-fetch-site'] === 'cross-site')) return res.status(403).json({ error: 'Request origin is not allowed.' }); next(); });
   app.use('/api', healthRoutes);
   app.use(express.json({ limit: '256kb' })); app.use(cookieParser()); app.use('/api', optionalAuth, routes);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found.' }));

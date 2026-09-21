@@ -113,7 +113,7 @@ Every handler is wrapped in `asyncHandler`, so rejected promises flow to one err
 ### Request lifecycle (authenticated write)
 
 1. Browser `fetch('/api/cards/:id', { method: 'PATCH', body: { ...fields, version } })` with the session cookie.
-2. `helmet` → `cors` → global rate limit (300/min/IP) → `Cache-Control: no-store` → **CSRF guard**: non-GET requests whose `Origin` is not in `CLIENT_ORIGIN`, or whose `Sec-Fetch-Site` is `cross-site`, get 403.
+2. `helmet` → `cors` → global rate limit (300/min/IP) → `Cache-Control: no-store` → **CSRF guard**: non-GET requests get 403 unless their `Origin` host equals the request `Host` (same-origin) or is in `CLIENT_ORIGIN`; `Sec-Fetch-Site: cross-site` is always rejected.
 3. `express.json` (256 kB cap) → `cookieParser` → `optionalAuth`: `sha256(cookie)` looked up in `sessions`, unexpired → `req.user`.
 4. Route: `requireAuth` → `validate(cardSchema.extend({ version }))` → controller.
 5. Controller calls `cardService.updateCard`, which calls `mutateFolder(folderId, user, 'editor', op)`.
@@ -193,7 +193,7 @@ Conflict-aware editing with polling, deliberately not CRDTs or live cursors. Whi
 | Threat | Control |
 | --- | --- |
 | XSS | Helmet CSP: `script-src 'self'`, no inline scripts; React escaping; cards are plain text |
-| CSRF | `SameSite=Lax` cookie + `Origin`/`Sec-Fetch-Site` check on every non-GET `/api` request |
+| CSRF | `SameSite=Lax` cookie + `Origin`/`Sec-Fetch-Site` check on every non-GET `/api` request. Same-origin is detected by comparing the `Origin` host with the `Host` header; a browser never lets attacker JS forge `Origin`, so this cannot be bypassed from a foreign page |
 | Malicious uploads | `sharp` decodes and re-encodes every image to WebP: rejects non-images regardless of extension/MIME, strips EXIF, caps dimensions (1600 px) and pixel count (25 MP), 5 MB upload / 3 MB stored |
 | Credential leaks | `select: false` on secrets, hashed session tokens, hashed passwords, no secrets in `/api/health` |
 | Enumeration | Private folders return 404 for outsiders; public profiles show only `name`, `username`, `bio` |
@@ -255,7 +255,7 @@ The standard build explicitly disables demo mode. Express serves the React build
 | Variable | Purpose |
 | --- | --- |
 | `MONGODB_URI` | Authenticated replica-set connection string; keep server-side |
-| `CLIENT_ORIGIN` | Exact trusted browser origin, e.g. `https://recall.example.com` |
+| `CLIENT_ORIGIN` | Optional for same-origin deployments (requests from the app's own host are always trusted). Set to the exact frontend origin(s), comma-separated, only when the frontend is hosted separately |
 | `PORT` | Server port; default 4000 |
 | `NODE_ENV` | Set to `production` behind HTTPS for secure session cookies |
 | `TRUST_PROXY` | Set to `1` only behind exactly one trusted reverse proxy |

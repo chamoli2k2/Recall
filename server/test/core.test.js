@@ -32,3 +32,13 @@ test('API health, anonymous writes, untrusted origins and input validation', asy
   assert.equal((await request(app).post('/api/auth/signup').send({ username: 'x' })).status, 400);
   assert.equal((await request(app).get('/api/unknown')).status, 404);
 });
+test('CSRF guard: same-origin writes pass without CLIENT_ORIGIN, allow-listed origins pass, foreign origins are rejected', async () => {
+  const app = createApp(); const post = () => request(app).post('/api/auth/signup').send({});
+  // Same host as the request itself → allowed regardless of CLIENT_ORIGIN; reaches validation (400), not 403.
+  assert.equal((await post().set('Host', 'recall-demo.onrender.com').set('Origin', 'https://recall-demo.onrender.com')).status, 400);
+  assert.equal((await post().set('Host', 'recall-demo.onrender.com').set('Origin', 'https://evil.example')).status, 403);
+  assert.equal((await post().set('Host', 'recall-demo.onrender.com').set('Origin', 'https://recall-demo.onrender.com.evil.example')).status, 403);
+  assert.equal((await post().set('Host', 'recall-demo.onrender.com').set('Origin', 'https://recall-demo.onrender.com').set('Sec-Fetch-Site', 'cross-site')).status, 403);
+  assert.equal((await post().set('Origin', 'http://localhost:4173')).status, 400, 'default CLIENT_ORIGIN still allow-listed');
+  assert.equal((await post().set('Origin', 'not a url')).status, 403);
+});
