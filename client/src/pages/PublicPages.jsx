@@ -1,15 +1,23 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Globe2, RotateCcw } from 'lucide-react';
+import { Link, NavLink, useParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Globe2, RotateCcw, LogIn } from 'lucide-react';
 import { api, imageUrl } from '../services/api';
 import { useLoad } from '../hooks/useApp';
 import { Avatar, FolderIcon, Loading, ErrorState, Tag, Empty } from '../components/ui';
 import ThemeToggle from '../components/ThemeToggle';
-export function PublicShell({ children }) { return <div className="public-page"><header><Link className="brand" to="/"><img src="/favicon.svg" alt=""/>recall.</Link><div className="public-header-actions"><ThemeToggle/><Link className="button primary" to="/">Sign in to your space <ArrowRight size={16}/></Link></div></header><main>{children}</main></div>; }
+export function PublicShell({ children, wide }) {
+  return <div className={`public-page ${wide ? 'public-page-wide' : ''}`}>
+    <header className="public-header"><Link className="brand" to="/"><img src="/favicon.svg" alt=""/>recall<span className="brand-period">.</span></Link>
+      <nav className="public-nav" aria-label="Main"><NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>Home</NavLink><NavLink to="/explore" className={({ isActive }) => isActive ? 'active' : ''}>Explore</NavLink></nav>
+      <div className="public-header-actions"><ThemeToggle/><Link className="button secondary public-signin" to="/login"><LogIn size={16}/> Sign in</Link><Link className="button primary" to="/signup">Get started <ArrowRight size={16}/></Link></div></header>
+    <main>{children}</main>
+    <footer className="public-footer"><span>Made for a curious mind.</span><span><Link to="/explore">Explore</Link> · <Link to="/login">Sign in</Link> · <Link to="/signup">Create an account</Link></span></footer>
+  </div>;
+}
 export function PublicFolderPage() {
   const { id } = useParams(); const { data, loading, error } = useLoad(() => Promise.all([api(`/folders/${id}`), api(`/folders/${id}/cards`)]).then(([f, c]) => ({ ...f, ...c })), [id]); const [flipped, setFlipped] = useState({});
-  if (loading) return <Loading/>; if (error) return <Empty title="This collection isn’t available" text="It may be private. Sign in with an invited account to open it." action={<Link className="button primary" to="/">Sign in</Link>}/>;
-  return <><div className="page-heading"><div><span className="eyebrow">A PUBLIC COLLECTION</span><h1>{data.folder.title}</h1><p>{data.folder.description}</p><Link to={`/u/${data.folder.owner.username}`} className="text-button">by @{data.folder.owner.username}</Link></div><div className={`large-folder-icon ${data.folder.color}`}><FolderIcon name={data.folder.icon} size={32}/></div></div><div className="inline-note public-note">Flip a card to study. Sign in to save this folder and track your progress.</div><div className="flashcard-grid">{data.cards.map((card, i) => { const side = flipped[card.id] ? card.back : card.front; return <article className="flashcard-item" key={card.id}><div className="flashcard-top">{i + 1} · {flipped[card.id] ? 'ANSWER' : 'QUESTION'}</div><button className="card-content" aria-label={`Flip card ${i + 1}`} onClick={() => setFlipped(f => ({ ...f, [card.id]: !f[card.id] }))}>{side.image && <img src={imageUrl(side.image)} alt={side.text || 'Flashcard image'}/>}<p>{side.text}</p></button><div className="flashcard-footer"><div>{card.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}</div><RotateCcw size={14}/></div></article>; })}</div></>;
+  if (loading) return <Loading/>; if (error) return <Empty title="This collection isn’t available" text="It may be private. Sign in with an invited account to open it." action={<Link className="button primary" to="/login">Sign in</Link>}/>;
+  return <><Link to="/explore" className="back-link"><ArrowLeft size={16}/> Explore collections</Link><div className="page-heading"><div><span className="eyebrow">A PUBLIC COLLECTION</span><h1>{data.folder.title}</h1><p>{data.folder.description}</p><Link to={`/u/${data.folder.owner.username}`} className="text-button">by @{data.folder.owner.username}</Link></div><div className={`large-folder-icon ${data.folder.color}`}><FolderIcon name={data.folder.icon} size={32}/></div></div><div className="folder-study-strip public-study-strip"><div><span className="study-strip-icon"><Globe2 size={22}/></span><div><h3>Flip any card to study it right here.</h3><p>Sign in to save this collection, make a private copy, and track your progress.</p></div></div><div><Link className="button primary" to="/signup">Create a free account</Link><Link className="button secondary" to="/login">Sign in</Link></div></div><div className="flashcard-grid">{data.cards.map((card, i) => { const side = flipped[card.id] ? card.back : card.front; return <article className="flashcard-item" key={card.id}><div className="flashcard-top">{i + 1} · {flipped[card.id] ? 'ANSWER' : 'QUESTION'}</div><button className="card-content" aria-label={`Flip card ${i + 1}`} onClick={() => setFlipped(f => ({ ...f, [card.id]: !f[card.id] }))}>{side.image && <img src={imageUrl(side.image)} alt={side.text || 'Flashcard image'}/>}<p>{side.text}</p></button><div className="flashcard-footer"><div>{card.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}</div><RotateCcw size={14}/></div></article>; })}</div></>;
 }
 export function ProfilePage() {
   const { username } = useParams(); const { data, loading, error } = useLoad(() => api(`/users/${username}`), [username]);

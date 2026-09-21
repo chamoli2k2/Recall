@@ -11,6 +11,7 @@ A collaborative flashcard application built with **React, Express, and MongoDB**
 - Collaborative editing with version conflict detection, change history, and restoration into a new draft.
 - Folder activity and polling for committed changes every 15 seconds while viewing a folder.
 - Global discovery, public profiles, anonymous public-card viewing, saved collections, and private copies.
+- A public home page at `/` for signed-out visitors: interactive sample card, how-it-works, live public collections, and clear sign-in/sign-up paths (`/login`, `/signup`). Anonymous visitors can read and flip public cards but cannot create, edit, save, or copy — the API enforces this, not just the UI.
 - Quick review, due-card study, review scheduling, daily goals, personal progress, and keyboard shortcuts.
 - Archive and restore folders; confirmed permanent deletion of individual cards.
 - Permission-checked image delivery. Images are decoded, resized, stripped of metadata, and stored in MongoDB.
@@ -104,7 +105,7 @@ Every handler is wrapped in `asyncHandler`, so rejected promises flow to one err
 
 | Directory | Responsibility |
 | --- | --- |
-| `client/src/pages` | Route-level views (Library, Folder, Study, Account, Public) |
+| `client/src/pages` | Route-level views (Home, Library, Folder, Study, Account, Public) |
 | `client/src/components` | Reusable presentation: `CardEditor`, `ShareModal`, `FolderModal`, Radix-based `ui.jsx` primitives |
 | `client/src/hooks/useApp.jsx` | Session context (`/auth/me` on boot), `useLoad` data-fetching hook with cancellation on unmount |
 | `client/src/services/api.js` | Single `fetch` wrapper: `credentials: 'include'`, JSON handling, error objects carrying `status` and `code` |
