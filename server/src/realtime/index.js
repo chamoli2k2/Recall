@@ -5,6 +5,7 @@ import { accessFolder } from '../services/accessService.js';
 import { onEvent } from './bus.js';
 import { PresenceStore } from './presence.js';
 import { DocStore } from './docs.js';
+import { RoomStore } from './rooms.js';
 const parseCookies = header => Object.fromEntries((header || '').split(';').map(p => p.trim().split('=')).filter(([k]) => k).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
 const same = (origin, host) => { try { return !!origin && new URL(origin).host === host; } catch { return false; } };
 export const presence = new PresenceStore();
@@ -12,6 +13,7 @@ export const docs = new DocStore({
   load: async cardId => { const d = await CardDoc.findOne({ card: cardId }).select('+state'); return d ? { state: d.state, updatedAt: d.updatedAt } : null; },
   save: (cardId, state) => CardDoc.updateOne({ card: cardId }, { $set: { state } }, { upsert: true })
 });
+export const rooms = new RoomStore();
 /** Attaches the realtime layer to the HTTP server. Sockets only observe; every mutation still goes through HTTP + transactions. */
 export function attachRealtime(httpServer, origins) {
   const io = new Server(httpServer, {
@@ -23,7 +25,7 @@ export function attachRealtime(httpServer, origins) {
   io.use(async (socket, next) => {
     try { const token = parseCookies(socket.handshake.headers.cookie).recall_session; if (token) { const s = await Session.findOne({ tokenHash: hashToken(token), expiresAt: { $gt: new Date() } }); if (s) socket.data.user = await User.findById(s.user); } next(); } catch (e) { next(e); }
   });
-  const room = id => `folder:${id}`, docRoom = id => `doc:${id}`;
+  const room = id => `folder:${id}`, docRoom = id => `doc:${id}`, quizRoom = code => `quiz:${code}`;
   const broadcastPresence = folderId => io.to(room(folderId)).emit('presence', folderId, presence.list(folderId));
   io.on('connection', socket => {
     socket.data.docs = new Map();
@@ -46,8 +48,34 @@ export function attachRealtime(httpServer, origins) {
     socket.on('doc:awareness', (cardId, update) => { if (socket.data.docs.has(cardId) && update) socket.to(docRoom(cardId)).emit('doc:awareness', cardId, update); });
     const leaveDoc = async cardId => { if (!socket.data.docs.has(cardId)) return; socket.data.docs.delete(cardId); socket.leave(docRoom(cardId)); socket.to(docRoom(cardId)).emit('doc:peer-left', cardId, socket.id); await docs.release(cardId); };
     socket.on('doc:leave', leaveDoc);
-    socket.on('disconnect', async () => { for (const f of presence.drop(socket.id)) broadcastPresence(f); for (const cardId of [...socket.data.docs.keys()]) await leaveDoc(cardId); });
+    // Live quiz rooms. Only signed-in users can play (players need a name and a stable id); the host needs read access to the folder.
+    socket.data.rooms = new Set();
+    const signedIn = ack => { if (socket.data.user) return true; ack({ ok: false, error: 'Sign in to play.' }); return false; };
+    const enterRoom = code => { socket.data.rooms.add(code); socket.join(quizRoom(code)); };
+    socket.on('room:create', async (folderId, options = {}, ack = () => {}) => {
+      if (!signedIn(ack)) return;
+      try {
+        const folder = await accessFolder(folderId, socket.data.user);
+        const cards = await Card.find({ folder: folder.id }).select('front back').lean();
+        const room = rooms.create({ folder, host: socket.data.user, cards: cards.map(c => ({ ...c, id: c._id })), count: options?.count, seconds: options?.seconds });
+        enterRoom(room.code); ack({ ok: true, code: room.code, room: rooms.snapshot(room.code, socket.data.user.id) });
+      } catch (e) { ack({ ok: false, error: e.status === 400 ? e.message : e.status === 404 ? 'Folder not found.' : 'No access.' }); }
+    });
+    socket.on('room:join', (code, ack = () => {}) => {
+      if (!signedIn(ack)) return;
+      try { const room = rooms.join(code, socket.data.user); enterRoom(room.code); ack({ ok: true, code: room.code, room: rooms.snapshot(room.code, socket.data.user.id) }); }
+      catch (e) { ack({ ok: false, error: e.message }); }
+    });
+    const leaveRoom = code => { if (!socket.data.rooms.has(code)) return; socket.data.rooms.delete(code); socket.leave(quizRoom(code)); rooms.leave(code, socket.data.user?.id); };
+    socket.on('room:leave', leaveRoom);
+    const hostAction = fn => (code, ack = () => {}) => { if (!socket.data.rooms.has(code)) return; try { fn(code); ack({ ok: true }); } catch (e) { ack({ ok: false, error: e.message }); } };
+    socket.on('room:start', hostAction(code => rooms.start(code, socket.data.user.id)));
+    socket.on('room:next', hostAction(code => rooms.next(code, socket.data.user.id)));
+    socket.on('room:answer', (code, choice) => { if (socket.data.rooms.has(code)) rooms.answer(code, socket.data.user.id, choice); });
+    socket.on('disconnect', async () => { for (const f of presence.drop(socket.id)) broadcastPresence(f); for (const cardId of [...socket.data.docs.keys()]) await leaveDoc(cardId); for (const code of [...socket.data.rooms]) leaveRoom(code); });
   });
+  // Room state is broadcast whole on every change; each socket gets a view with its own answer and without the answer key mid-question.
+  rooms.onChange(room => { for (const socketId of io.sockets.adapter.rooms.get(quizRoom(room.code)) || []) { const s = io.sockets.sockets.get(socketId); if (s) s.emit('room:state', rooms.snapshot(room.code, s.data.user?.id)); } });
   // Committed domain events fan out to everyone watching the folder. Membership changes re-check every watcher's access.
   onEvent(async event => {
     io.to(room(event.folderId)).emit('folder:event', event);

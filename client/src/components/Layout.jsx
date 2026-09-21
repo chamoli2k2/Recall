@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
-import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, PanelLeftClose, Menu as MenuIcon, Search, Command, Archive, LogOut, Layers } from 'lucide-react';
+import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, PanelLeftClose, Menu as MenuIcon, Search, Command, Archive, LogOut, Layers, Swords } from 'lucide-react';
 import { Avatar, Button, Modal } from './ui';
 import { useApp, useLoad } from '../hooks/useApp';
 import { api } from '../services/api';
@@ -11,7 +11,7 @@ export default function Layout() {
   const { user, isDemo, revision, setUser } = useApp(); const navigate = useNavigate();
   const [create, setCreate] = useState(false), [mobile, setMobile] = useState(false), [help, setHelp] = useState(false), [query, setQuery] = useState('');
   const { data } = useLoad(() => api('/folders'), [revision]);
-  const nav = [['/', LibraryBig, 'My library'], ['/shared', Users, 'Shared with me'], ['/explore', Compass, 'Explore'], ['/progress', ChartNoAxesCombined, 'My progress']];
+  const nav = [['/', LibraryBig, 'My library'], ['/shared', Users, 'Shared with me'], ['/explore', Compass, 'Explore'], ['/progress', ChartNoAxesCombined, 'My progress'], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz']])];
   return <div className="app-shell">
     {mobile && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobile(false)}/>}
     <aside className={`sidebar ${mobile ? 'open' : ''}`}>

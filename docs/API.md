@@ -52,6 +52,13 @@ The socket authenticates from the `recall_session` cookie during the handshake; 
 | server → client | `folder:event` (event) | `{ type, folderId, aggregateId, detail, actor, at, version? }` after a transaction commits |
 | server → client | `folder:revoked` (folderId) | Caller lost access; they were removed from the room and its documents |
 | server → client | `doc:update`, `doc:awareness`, `doc:peer-joined`, `doc:peer-left` | Co-editing relay |
+| client → server | `room:create` (folderId, `{ count?, seconds? }`, ack) | Signed-in reader of the folder hosts a live quiz. Ack `{ ok, code, room }`. 2–30 questions, 5–60 s each |
+| client → server | `room:join` (code, ack) / `room:leave` (code) | Any signed-in user; ack `{ ok, code, room }` or `{ ok: false, error }` |
+| client → server | `room:start` (code, ack) / `room:next` (code, ack) | Host only; `next` moves reveal → next question, or → `finished` after the last one |
+| client → server | `room:answer` (code, optionIndex) | One answer per player per question; ignored after the deadline |
+| server → client | `room:state` (room) | Whole-room snapshot after every change: `{ code, phase, index, total, deadline, players[], question: { prompt, options, correct }, myAnswer, results }`. `correct`, `myAnswer.correct` and `results` are `null` while a question is open |
+
+Both sides need text or an image, unless the front contains a cloze deletion (then the back may be empty).
 
 ## Create a card
 
@@ -65,7 +72,7 @@ The socket authenticates from the `recall_session` cookie during the handshake; 
 }
 ```
 
-Both sides need text or an image. Each image ID must belong to the target folder. Folder identity comes from the route and cannot be replaced through card input.
+Each image ID must belong to the target folder. Folder identity comes from the route and cannot be replaced through card input.
 
 ## Version conflict
 

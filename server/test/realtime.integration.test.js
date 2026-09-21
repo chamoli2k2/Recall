@@ -9,7 +9,7 @@ import * as Y from 'yjs';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createApp } from '../src/app.js';
 import { allModels, CardDoc } from '../src/models/index.js';
-import { attachRealtime, presence, docs } from '../src/realtime/index.js';
+import { attachRealtime, presence, docs, rooms } from '../src/realtime/index.js';
 const enabled = process.env.RUN_INTEGRATION === '1';
 let mongo, server, io, url, owner, editor, outsider, folderId, cardId;
 const password = 'Integration-only-password-2026';
@@ -84,4 +84,27 @@ integration('revoking a member ejects their sockets from the room and their open
   assert.equal(revokedId, folderId); assert.equal(presence.list(folderId).some(p => p.user.username === 'editor'), false);
   for (let i = 0; i < 40 && docs.docs.has(cardId); i++) await new Promise(r => setTimeout(r, 25)); assert.equal(docs.docs.has(cardId), false);
   let leaked = false; e.on('folder:event', () => { leaked = true; }); await owner.post(`/api/folders/${folderId}/cards`).send({ front: { text: 'Secret' }, back: { text: 'x' } }); await new Promise(r => setTimeout(r, 150)); assert.equal(leaked, false); e.disconnect();
+});
+integration('a live quiz room: host needs folder access, players need to be signed in, answers are scored and the key is withheld until reveal', async () => {
+  // The folder has two cards by now ("Oh. Hello there!"/"World" and "Secret"/"x"), the minimum for a quiz.
+  const [h, p, x, anon] = [client(owner), client(outsider), client(editor), client(null)]; await Promise.all([h, p, x, anon].map(connected));
+  assert.equal((await emit(anon, 'room:create', folderId, {})).error, 'Sign in to play.');
+  assert.equal((await emit(x, 'room:create', folderId, {})).error, 'Folder not found.', 'the removed editor cannot host from this folder (private folders 404 for strangers)');
+  const created = await emit(h, 'room:create', folderId, { count: 2, seconds: 5 }); assert.equal(created.ok, true, JSON.stringify(created)); const code = created.code;
+  assert.match(code, /^[A-Z0-9]{6}$/); assert.equal(created.room.phase, 'lobby'); assert.equal(created.room.total, 2);
+  assert.equal((await emit(anon, 'room:join', code)).error, 'Sign in to play.'); assert.match((await emit(p, 'room:join', 'NOPE00')).error, /Room not found/);
+  const [joined, [hostView]] = await Promise.all([emit(p, 'room:join', code.toLowerCase()), once(h, 'room:state', r => r.players.length === 2)]);
+  assert.equal(joined.ok, true); assert.deepEqual(hostView.players.map(pl => pl.username).sort(), ['outsider', 'owner']); assert.equal(hostView.players.find(pl => pl.isHost).username, 'owner');
+  assert.equal((await emit(p, 'room:start', code)).error, 'Only the host can do that.');
+  const [, [q]] = await Promise.all([emit(h, 'room:start', code), once(p, 'room:state', r => r.phase === 'question')]);
+  assert.equal(q.question.correct, null, 'answer key hidden while the question is open'); assert.equal(q.question.options.length, 2); assert.ok(q.deadline > Date.now());
+  const key = rooms.get(code).questions[0].correct;
+  p.emit('room:answer', code, key); const [mine] = await once(p, 'room:state', r => r.myAnswer); assert.equal(mine.myAnswer.correct, null, 'not even your own verdict leaks early');
+  const [, [revealed]] = await Promise.all([h.emit('room:answer', code, (key + 1) % 2), once(p, 'room:state', r => r.phase === 'reveal')]);
+  assert.equal(revealed.question.correct, key); assert.equal(revealed.myAnswer.correct, true); assert.ok(revealed.myAnswer.points >= 500); assert.equal(revealed.players[0].username, 'outsider'); assert.equal(revealed.results[revealed.hostId].correct, false);
+  await emit(h, 'room:next', code); await emit(h, 'room:next', code); // reveal -> question 2; a second "next" is ignored while a question is open
+  assert.equal(rooms.get(code).phase, 'question'); assert.equal(rooms.get(code).index, 1);
+  rooms.reveal(code); const [, [done]] = await Promise.all([emit(h, 'room:next', code), once(p, 'room:state', r => r.phase === 'finished')]); assert.equal(done.players.length, 2);
+  h.disconnect(); p.disconnect(); for (let i = 0; i < 40 && rooms.get(code); i++) await new Promise(r => setTimeout(r, 25)); assert.equal(rooms.get(code), undefined, 'room closed when the last player left');
+  x.disconnect(); anon.disconnect();
 });

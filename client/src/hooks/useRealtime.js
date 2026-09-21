@@ -20,6 +20,30 @@ export function useFolderRealtime(folderId, { onEvent, onRevoked } = {}) {
   const setEditing = useCallback(cardId => { if (socket?.connected && folderId) socket.emit('card:editing', folderId, cardId || null); }, [folderId]);
   return { presence, connected, setEditing };
 }
+/** Joins (or, with `create`, hosts) a live quiz room and mirrors the server's room snapshot. */
+export function useRoom(code, { folderId, options } = {}) {
+  const [room, setRoom] = useState(null); const [error, setError] = useState(''); const [joinedCode, setJoinedCode] = useState(null);
+  const creating = !code && !!folderId; const joinedRef = useRef(null), keep = useRef(false);
+  useEffect(() => {
+    if (!socket || (!code && !folderId)) return; connectRealtime(); let cancelled = false;
+    // Hosting creates the room, then the page navigates to /rooms/CODE. That re-runs this effect with the new code;
+    // since we are already in that room, keep the membership instead of leaving and re-joining (which would destroy it).
+    let current = null; if (code && joinedRef.current === code) { current = code; keep.current = true; }
+    const handle = res => { if (cancelled) return; if (!res?.ok) { setError(res?.error || 'Could not join this room.'); return; } current = res.code; joinedRef.current = res.code; setJoinedCode(res.code); setRoom(res.room); setError(''); };
+    const join = () => creating ? socket.emit('room:create', folderId, options || {}, handle) : socket.emit('room:join', code, handle);
+    const onState = state => { if (state.code === current) setRoom(state); };
+    const onDisconnect = () => setError('Connection lost. Reconnecting…');
+    socket.on('room:state', onState); socket.on('connect', join); socket.on('disconnect', onDisconnect);
+    if (socket.connected && !current) join();
+    return () => {
+      cancelled = true; socket.off('room:state', onState); socket.off('connect', join); socket.off('disconnect', onDisconnect);
+      keep.current = false; const leaving = current;
+      setTimeout(() => { if (!leaving || keep.current) return; if (socket.connected) socket.emit('room:leave', leaving); if (joinedRef.current === leaving) joinedRef.current = null; }, 0);
+    };
+  }, [code, folderId]);
+  const act = useCallback((event, ...args) => new Promise(resolve => { if (!socket?.connected || !joinedCode) return resolve({ ok: false }); socket.emit(event, joinedCode, ...args, res => resolve(res || { ok: true })); }), [joinedCode]);
+  return { room, error, code: joinedCode, start: () => act('room:start'), next: () => act('room:next'), answer: choice => { if (socket?.connected && joinedCode) socket.emit('room:answer', joinedCode, choice); } };
+}
 /** Opens a card's shared Yjs document for live co-editing. Returns null-ish handles until the server has synced. */
 export function useCardDoc(cardId, user, enabled = true) {
   const [state, setState] = useState({ doc: null, awareness: null, ready: false, error: '', version: null });
