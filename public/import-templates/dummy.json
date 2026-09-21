@@ -1,0 +1,25 @@
+{
+  "cards": [
+    {
+      "front": { "text": "What is optimistic concurrency?" },
+      "back": { "text": "Each write sends the version it last read. If that version no longer matches, the server returns 409 and does not overwrite." },
+      "tags": ["concurrency", "databases"],
+      "hint": "Think about two editors saving the same card.",
+      "source": "https://example.com/concurrency"
+    },
+    {
+      "front": { "text": "The {{c1::heart}} pumps blood." },
+      "back": { "text": "" },
+      "tags": ["biology", "cloze"],
+      "hint": "A cloze card can leave the back empty.",
+      "source": ""
+    },
+    {
+      "front": { "text": "Inline math: the quadratic formula is $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$" },
+      "back": { "text": "Block math:\n\n$$E = mc^2$$\n\nMarkdown, LaTeX, and cloze all import as plain source." },
+      "tags": ["math"],
+      "hint": "",
+      "source": ""
+    }
+  ]
+}

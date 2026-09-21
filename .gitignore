@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.local
+demo-credentials.txt
 .sites-runtime/
 .local-data/
 coverage/

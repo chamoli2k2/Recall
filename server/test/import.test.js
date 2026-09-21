@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { zipSync, strToU8 } from 'fflate';
 import { parseCsv, parseDelimited, parseMarkdown, parseAnkiText, parseJson, parseApkg, parseFile, stripHtml, toCsv, detectFormat } from '../src/services/importService.js';
+const templates = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public/import-templates');
 test('CSV: header row in any order, positional columns, quoted fields with commas and newlines, TSV auto-detection', () => {
   const withHeader = parseCsv('Answer,Tags,Question\n"Paris, France",geo europe,Capital of France?\nBerlin,geo,Capital of Germany?');
   assert.deepEqual(withHeader.map(c => [c.front.text, c.back.text, c.tags]), [['Capital of France?', 'Paris, France', ['geo', 'europe']], ['Capital of Germany?', 'Berlin', ['geo']]]);
@@ -44,4 +48,14 @@ test('JSON round-trip through export and detection of formats by name and conten
   assert.equal(detectFormat('deck.apkg'), 'apkg'); assert.equal(detectFormat('notes.md'), 'markdown'); assert.equal(detectFormat('x.tsv'), 'csv'); assert.equal(detectFormat('x', 'application/json'), 'json');
   assert.equal((await parseFile(Buffer.from('#separator:tab\n#html:false\na\tb\n'), 'export.txt', 'text/plain')).format, 'anki-text');
   assert.equal((await parseFile(Buffer.from('a,b\n'), 'plain.txt', 'text/plain')).format, 'csv');
+});
+test('downloadable dummy templates parse into usable cards', async () => {
+  const json = await parseFile(fs.readFileSync(path.join(templates, 'dummy.json')), 'dummy.json', 'application/json');
+  const csv = await parseFile(fs.readFileSync(path.join(templates, 'dummy.csv')), 'dummy.csv', 'text/csv');
+  const md = await parseFile(fs.readFileSync(path.join(templates, 'dummy.md')), 'dummy.md', 'text/markdown');
+  const txt = await parseFile(fs.readFileSync(path.join(templates, 'dummy.txt')), 'dummy.txt', 'text/plain');
+  assert.equal(json.format, 'json'); assert.ok(json.cards.length >= 2); assert.ok(json.cards.some(c => c.front.text.includes('optimistic')));
+  assert.equal(csv.format, 'csv'); assert.ok(csv.cards.length >= 3);
+  assert.equal(md.format, 'markdown'); assert.ok(md.cards.length >= 3);
+  assert.equal(txt.format, 'anki-text'); assert.ok(txt.cards.length >= 2);
 });

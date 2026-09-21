@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="820" viewBox="0 0 1600 820" font-family="Arial, Helvetica, sans-serif" xml:space="preserve">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1020"/><stop offset="1" stop-color="#141a33"/></linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16a34a"/><stop offset="1" stop-color="#22c55e"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2340"/><stop offset="1" stop-color="#151b33"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#86efac"/></marker>
+  </defs>
+  <rect width="1600" height="820" fill="url(#bg)"/>
+  <text x="56" y="58" font-size="30" font-weight="700" fill="#f8fafc">Data model</text>
+  <text x="56" y="88" font-size="15" fill="#94a3b8">Folder is the aggregate root for authorization and concurrency. Cards inherit ACL. Study state is per user.</text>
+
+  <rect x="80" y="140" width="220" height="100" rx="16" fill="url(#panel)" stroke="#22c55e"/>
+  <text x="100" y="180" font-weight="700" fill="#bbf7d0">users</text>
+  <text x="100" y="206" font-size="13" fill="#94a3b8">unique username, email</text>
+  <text x="100" y="226" font-size="13" fill="#94a3b8">desiredRetention, saved[]</text>
+
+  <rect x="380" y="140" width="260" height="130" rx="16" fill="#1b2a1f" stroke="#22c55e"/>
+  <text x="400" y="180" font-weight="700" fill="#bbf7d0">folders</text>
+  <text x="400" y="206" font-size="13" fill="#cbd5e1">owner, members[], visibility</text>
+  <text x="400" y="226" font-size="13" fill="#cbd5e1">version + writeEpoch</text>
+  <text x="400" y="246" font-size="13" fill="#94a3b8">ACL + coordination point</text>
+
+  <rect x="720" y="140" width="260" height="130" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <text x="740" y="180" font-weight="700" fill="#e2e8f0">cards</text>
+  <text x="740" y="206" font-size="13" fill="#94a3b8">front/back text + image</text>
+  <text x="740" y="226" font-size="13" fill="#94a3b8">tags, hint, source, version</text>
+  <text x="740" y="246" font-size="13" fill="#94a3b8">Markdown / LaTeX / cloze</text>
+
+  <rect x="1060" y="140" width="220" height="100" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <text x="1080" y="180" font-weight="700" fill="#e2e8f0">revisions</text>
+  <text x="1080" y="206" font-size="13" fill="#94a3b8">unique (card, version)</text>
+  <text x="1080" y="226" font-size="13" fill="#94a3b8">full previous snapshot</text>
+
+  <rect x="1320" y="140" width="220" height="100" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <text x="1340" y="180" font-weight="700" fill="#e2e8f0">carddocs</text>
+  <text x="1340" y="206" font-size="13" fill="#94a3b8">Yjs CRDT state blob</text>
+  <text x="1340" y="226" font-size="13" fill="#94a3b8">one per open card</text>
+
+  <path d="M300 190 H380" stroke="#86efac" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M640 190 H720" stroke="#86efac" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M980 190 H1060" stroke="#86efac" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M850 270 V320" stroke="#86efac" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="80" y="340" width="240" height="110" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <text x="100" y="380" font-weight="700" fill="#e2e8f0">sessions</text>
+  <text x="100" y="406" font-size="13" fill="#94a3b8">sha256(token) unique</text>
+  <text x="100" y="426" font-size="13" fill="#94a3b8">TTL index expires: 0</text>
+
+  <rect x="360" y="340" width="260" height="110" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <text x="380" y="380" font-weight="700" fill="#e2e8f0">progress</text>
+  <text x="380" y="406" font-size="13" fill="#94a3b8">unique (user, card)</text>
+  <text x="380" y="426" font-size="13" fill="#94a3b8">FSRS S, D, state, dueAt</text>
+
+  <rect x="660" y="340" width="240" height="110" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <text x="680" y="380" font-weight="700" fill="#e2e8f0">reviews</text>
+  <text x="680" y="406" font-size="13" fill="#94a3b8">unique (user, requestId)</text>
+  <text x="680" y="426" font-size="13" fill="#94a3b8">idempotency ledger</text>
+
+  <rect x="940" y="340" width="240" height="110" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <text x="960" y="380" font-weight="700" fill="#e2e8f0">media</text>
+  <text x="960" y="406" font-size="13" fill="#94a3b8">folder-scoped WebP</text>
+  <text x="960" y="426" font-size="13" fill="#94a3b8">select:false data</text>
+
+  <rect x="1220" y="340" width="320" height="110" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <text x="1240" y="380" font-weight="700" fill="#e2e8f0">activity + domainevents</text>
+  <text x="1240" y="406" font-size="13" fill="#94a3b8">human feed + outbox</text>
+  <text x="1240" y="426" font-size="13" fill="#94a3b8">published only after commit</text>
+
+  <rect x="80" y="490" width="1440" height="280" rx="16" fill="url(#panel)" stroke="#2a3357"/>
+  <text x="104" y="534" font-size="18" font-weight="700" fill="#f1f5f9">Invariants</text>
+  <text x="104" y="574" font-size="14" fill="#cbd5e1">A card belongs to exactly one folder. Permission is never derived from a URL.</text>
+  <text x="104" y="604" font-size="14" fill="#cbd5e1">Progress is per learner. Two people studying the same card never share ratings or due dates.</text>
+  <text x="104" y="634" font-size="14" fill="#cbd5e1">Revisions store the previous snapshot, not a diff. Restore loads a draft; save creates a new version.</text>
+  <text x="104" y="664" font-size="14" fill="#cbd5e1">CardDoc is a cache of the CRDT. If card.updatedAt is newer than the CRDT, the document is re-seeded from the card.</text>
+  <text x="104" y="694" font-size="14" fill="#cbd5e1">passwordHash and email are select:false. Session tokens are stored as SHA-256 hashes, not plaintext.</text>
+  <text x="104" y="724" font-size="14" fill="#cbd5e1">Indexes follow queries: folders(owner, updatedAt), folders(visibility, archived), cards(folder, createdAt), reviews(user, requestId).</text>
+</svg>

@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" font-family="Arial, Helvetica, sans-serif" xml:space="preserve">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1020"/><stop offset="1" stop-color="#141a33"/></linearGradient>
+    <linearGradient id="rose" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e11d48"/><stop offset="1" stop-color="#f43f5e"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2340"/><stop offset="1" stop-color="#151b33"/></linearGradient>
+  </defs>
+  <rect width="1600" height="980" fill="url(#bg)"/>
+  <text x="56" y="58" font-size="30" font-weight="700" fill="#f8fafc">Concurrency control</text>
+  <text x="56" y="88" font-size="15" fill="#94a3b8">Folder is the aggregate root. Every write goes through mutateFolder() inside a replica-set transaction.</text>
+
+  <rect x="56" y="120" width="1488" height="70" rx="16" fill="url(#panel)" stroke="#2a3357"/>
+  <text x="80" y="164" font-size="16" fill="#e2e8f0">PATCH /api/cards/:id  &#183;  cookie session  &#183;  CSRF origin check  &#183;  zod cardSchema + version  &#183;  requireAuth</text>
+
+  <rect x="56" y="214" width="280" height="220" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <rect x="56" y="214" width="280" height="8" rx="4" fill="url(#rose)"/>
+  <text x="76" y="258" font-size="16" font-weight="700" fill="#fca5a5">1. Transaction</text>
+  <text x="76" y="290" font-size="13.5" fill="#cbd5e1">mongoose.connection</text>
+  <text x="76" y="312" font-size="13.5" fill="#cbd5e1">.transaction()</text>
+  <text x="76" y="344" font-size="13.5" fill="#cbd5e1">Card, Revision, Activity,</text>
+  <text x="76" y="366" font-size="13.5" fill="#cbd5e1">and DomainEvent commit</text>
+  <text x="76" y="388" font-size="13.5" fill="#cbd5e1">or roll back together.</text>
+
+  <rect x="356" y="214" width="280" height="220" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <rect x="356" y="214" width="280" height="8" rx="4" fill="url(#rose)"/>
+  <text x="376" y="258" font-size="16" font-weight="700" fill="#fca5a5">2. writeEpoch</text>
+  <text x="376" y="290" font-size="13.5" fill="#cbd5e1">Reload folder, roleOf(),</text>
+  <text x="376" y="312" font-size="13.5" fill="#cbd5e1">then $inc writeEpoch.</text>
+  <text x="376" y="344" font-size="13.5" fill="#cbd5e1">Two writers touch the</text>
+  <text x="376" y="366" font-size="13.5" fill="#cbd5e1">same folder doc. One</text>
+  <text x="376" y="388" font-size="13.5" fill="#cbd5e1">aborts (WriteConflict).</text>
+
+  <rect x="656" y="214" width="280" height="220" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <rect x="656" y="214" width="280" height="8" rx="4" fill="url(#rose)"/>
+  <text x="676" y="258" font-size="16" font-weight="700" fill="#fca5a5">3. Version</text>
+  <text x="676" y="290" font-size="13.5" fill="#cbd5e1">Client sends the version</text>
+  <text x="676" y="312" font-size="13.5" fill="#cbd5e1">it last read. Mismatch</text>
+  <text x="676" y="344" font-size="13.5" fill="#cbd5e1">returns 409 VERSION_</text>
+  <text x="676" y="366" font-size="13.5" fill="#cbd5e1">CONFLICT. Local draft</text>
+  <text x="676" y="388" font-size="13.5" fill="#cbd5e1">is kept, not overwritten.</text>
+
+  <rect x="956" y="214" width="280" height="220" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <rect x="956" y="214" width="280" height="8" rx="4" fill="url(#rose)"/>
+  <text x="976" y="258" font-size="16" font-weight="700" fill="#fca5a5">4. Idempotency</text>
+  <text x="976" y="290" font-size="13.5" fill="#cbd5e1">Reviews carry requestId</text>
+  <text x="976" y="312" font-size="13.5" fill="#cbd5e1">(UUID). Unique index on</text>
+  <text x="976" y="344" font-size="13.5" fill="#cbd5e1">(user, requestId). Retry</text>
+  <text x="976" y="366" font-size="13.5" fill="#cbd5e1">returns the stored result.</text>
+  <text x="976" y="388" font-size="13.5" fill="#cbd5e1">Different payload: 409.</text>
+
+  <rect x="1256" y="214" width="288" height="220" rx="16" fill="url(#panel)" stroke="#3b3f6b"/>
+  <rect x="1256" y="214" width="288" height="8" rx="4" fill="url(#rose)"/>
+  <text x="1276" y="258" font-size="16" font-weight="700" fill="#fca5a5">5. Unique indexes</text>
+  <text x="1276" y="290" font-size="13.5" fill="#cbd5e1">No check-then-insert.</text>
+  <text x="1276" y="312" font-size="13.5" fill="#cbd5e1">username, email,</text>
+  <text x="1276" y="334" font-size="13.5" fill="#cbd5e1">progress(user, card),</text>
+  <text x="1276" y="356" font-size="13.5" fill="#cbd5e1">revisions(card, version).</text>
+  <text x="1276" y="388" font-size="13.5" fill="#cbd5e1">E11000 maps to 409.</text>
+
+  <rect x="56" y="460" width="732" height="240" rx="16" fill="url(#panel)" stroke="#2a3357"/>
+  <text x="80" y="504" font-size="18" font-weight="700" fill="#fde68a">Why writeEpoch exists</text>
+  <text x="80" y="540" font-size="14" fill="#cbd5e1">MongoDB transactions use snapshot isolation. Two transactions that</text>
+  <text x="80" y="564" font-size="14" fill="#cbd5e1">read the same folder and write different cards would both commit.</text>
+  <text x="80" y="588" font-size="14" fill="#cbd5e1">A revoked editor could still land a write that started before revoke.</text>
+  <text x="80" y="624" font-size="14" fill="#cbd5e1">By making every write also update the folder document, the two</text>
+  <text x="80" y="648" font-size="14" fill="#cbd5e1">transactions collide. Mongoose retries the loser against committed state.</text>
+
+  <rect x="812" y="460" width="732" height="240" rx="16" fill="url(#panel)" stroke="#2a3357"/>
+  <text x="836" y="504" font-size="18" font-weight="700" fill="#c4b5fd">Why optimistic, not locks</text>
+  <text x="836" y="540" font-size="14" fill="#cbd5e1">Edits are rare relative to reads. Sessions are long. A lock held by a</text>
+  <text x="836" y="564" font-size="14" fill="#cbd5e1">closed tab would block collaborators.</text>
+  <text x="836" y="600" font-size="14" fill="#cbd5e1">Card text no longer conflicts (Yjs merges it). version still guards</text>
+  <text x="836" y="624" font-size="14" fill="#cbd5e1">tags, images, and folder metadata. Study progress is per user, so</text>
+  <text x="836" y="648" font-size="14" fill="#cbd5e1">collaborators never share ratings.</text>
+
+  <rect x="56" y="724" width="1488" height="216" rx="16" fill="url(#panel)" stroke="#2a3357"/>
+  <text x="80" y="768" font-size="18" font-weight="700" fill="#f1f5f9">Authorization is computed, not stored on the card</text>
+  <text x="80" y="804" font-size="14" fill="#cbd5e1">owner = folder.owner    editor = members[editor]    viewer = members[viewer] or visibility=global    null = 404 (not 403)</text>
+  <text x="80" y="836" font-size="14" fill="#cbd5e1">accessFolder(id, user, level, session) is the only choke point and runs inside the transaction for writes.</text>
+  <text x="80" y="868" font-size="14" fill="#cbd5e1">Images go through the same check. /api/media/:id is Cache-Control: private, no-store. Public responses hide member lists.</text>
+  <text x="80" y="900" font-size="14" fill="#94a3b8">Copying a folder deep-copies cards and media in one transaction so the copy survives revocation of the original.</text>
+</svg>

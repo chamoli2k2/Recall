@@ -1,15 +1,22 @@
 import { useState } from 'react';
-import { Link, NavLink, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Globe2, RotateCcw, LogIn } from 'lucide-react';
+import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Globe2, RotateCcw, LogIn, Search } from 'lucide-react';
 import { api, imageUrl } from '../services/api';
 import { useLoad } from '../hooks/useApp';
 import { Avatar, FolderIcon, Loading, ErrorState, Tag, Empty } from '../components/ui';
 import ThemeToggle from '../components/ThemeToggle';
 import RichText, { sideOf, plainText } from '../components/RichText';
+function matchesFolder(folder, query) {
+  if (!query) return true;
+  const hay = `${folder.title} ${folder.description} ${folder.tags?.join(' ') || ''} ${folder.owner?.username || ''}`.toLowerCase();
+  return hay.includes(query.toLowerCase());
+}
 export function PublicShell({ children, wide }) {
+  const navigate = useNavigate(); const [params] = useSearchParams(); const [query, setQuery] = useState(params.get('q') || '');
   return <div className={`public-page ${wide ? 'public-page-wide' : ''}`}>
     <header className="public-header"><Link className="brand" to="/"><img src="/favicon.svg" alt=""/>recall<span className="brand-period">.</span></Link>
       <nav className="public-nav" aria-label="Main"><NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>Home</NavLink><NavLink to="/explore" className={({ isActive }) => isActive ? 'active' : ''}>Explore</NavLink></nav>
+      <form className="public-search folder-search" onSubmit={e => { e.preventDefault(); navigate(query.trim() ? `/?q=${encodeURIComponent(query.trim())}#library` : '/#library'); }}><Search size={16}/><input aria-label="Search public collections" placeholder="Search collections…" value={query} onChange={e => setQuery(e.target.value)}/></form>
       <div className="public-header-actions"><ThemeToggle/><Link className="button secondary public-signin" to="/login"><LogIn size={16}/> Sign in</Link><Link className="button primary" to="/signup">Get started <ArrowRight size={16}/></Link></div></header>
     <main>{children}</main>
     <footer className="public-footer"><span>Made for a curious mind.</span><span><Link to="/explore">Explore</Link> · <Link to="/login">Sign in</Link> · <Link to="/signup">Create an account</Link></span></footer>
@@ -25,4 +32,12 @@ export function ProfilePage() {
   if (loading) return <Loading/>; if (error) return <ErrorState message={error}/>;
   return <><Link to="/explore" className="back-link"><ArrowLeft size={16}/> Explore collections</Link><div className="profile-header public-profile"><Avatar user={data.profile}/><div><span className="eyebrow">CURIOUS MIND</span><h1>{data.profile.name}</h1><p>@{data.profile.username}</p>{data.profile.bio && <p>{data.profile.bio}</p>}</div></div><div className="library-section-heading"><h2>Public collections <span>{data.folders.length}</span></h2></div>{!data.folders.length ? <Empty title="A little mystery" text="This learner hasn’t published any collections yet."/> : <div className="folder-grid">{data.folders.map(folder => <Link className="public-folder" to={`/folders/${folder.id}`} key={folder.id}><div className={`large-folder-icon ${folder.color}`}><FolderIcon name={folder.icon} size={28}/></div><h3>{folder.title}</h3><p>{folder.description}</p><span>{folder.cardCount} cards <ArrowRight size={15}/></span></Link>)}</div>}</>;
 }
-export function PublicExplorePage() { const { data, loading, error } = useLoad(() => api('/folders?scope=explore'), []); if (loading) return <Loading/>; if (error) return <ErrorState message={error}/>; return <><div className="page-heading"><div><span className="eyebrow">THE COMMUNITY LIBRARY</span><h1>Follow your curiosity.</h1><p>Public collections from curious people.</p></div></div><div className="folder-grid">{data.folders.map(folder => <Link className="public-folder" to={`/folders/${folder.id}`} key={folder.id}><div className={`large-folder-icon ${folder.color}`}><FolderIcon name={folder.icon} size={28}/></div><h3>{folder.title}</h3><p>{folder.description}</p><span>{folder.cardCount} cards <ArrowRight size={15}/></span></Link>)}</div></>; }
+export function PublicExplorePage() {
+  const [params, setParams] = useSearchParams(); const query = params.get('q') || '';
+  const { data, loading, error } = useLoad(() => api('/folders?scope=explore'), []);
+  if (loading) return <Loading/>; if (error) return <ErrorState message={error}/>;
+  const folders = (data.folders || []).filter(f => matchesFolder(f, query));
+  return <><div className="page-heading"><div><span className="eyebrow">THE COMMUNITY LIBRARY</span><h1>Follow your curiosity.</h1><p>Public collections from curious people. Search without signing in.</p></div></div>
+    <form className="home-search folder-search explore-search" onSubmit={e => e.preventDefault()}><Search size={16}/><input aria-label="Search public collections" placeholder="Search public collections…" value={query} onChange={e => setParams(e.target.value ? { q: e.target.value } : {})}/></form>
+    {!folders.length ? <Empty title={query ? 'No matching collections' : 'Nothing public yet'} text={query ? 'Try another word. Titles, descriptions, tags, and authors are searchable.' : 'Publish a folder to share it with everyone.'}/> : <div className="folder-grid">{folders.map(folder => <Link className="public-folder" to={`/folders/${folder.id}`} key={folder.id}><div className={`large-folder-icon ${folder.color}`}><FolderIcon name={folder.icon} size={28}/></div><h3>{folder.title}</h3><p>{folder.description}</p><span>{folder.cardCount} cards <ArrowRight size={15}/></span></Link>)}</div>}</>;
+}

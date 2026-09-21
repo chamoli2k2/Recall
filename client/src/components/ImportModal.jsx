@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, FileText, Check } from 'lucide-react';
+import { Upload, FileText, Check, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal, Button, ErrorState, Field } from './ui';
 import { api } from '../services/api';
@@ -24,11 +24,12 @@ export default function ImportModal({ folder, onClose }) {
         <strong>{file ? file.name : 'Drop a file here or click to choose'}</strong>
         <small>{file ? `${(file.size / 1024).toFixed(file.size > 102400 ? 0 : 1)} KB` : '.apkg · Anki .txt · .csv / .tsv · .md · .json'}</small>
       </label>
+      <div className="import-templates"><span><Download size={14}/> Download a sample file</span><a href="/import-templates/dummy.json" download="dummy.json">dummy.json</a><a href="/import-templates/dummy.csv" download="dummy.csv">dummy.csv</a><a href="/import-templates/dummy.md" download="dummy.md">dummy.md</a><a href="/import-templates/dummy.txt" download="dummy.txt">dummy.txt</a></div>
       <details className="import-help"><summary>Which formats work?</summary><ul>
-        <li><strong>Anki</strong> — File → Export → "Anki Deck Package (.apkg)" with <em>Support older Anki versions</em> checked, or "Notes in Plain Text (.txt)". Text is imported; images and audio are not.</li>
-        <li><strong>CSV / TSV</strong> — two columns (front, back) with optional tags, hint, source columns, or a header row naming them. Quotes and multi-line cells are fine.</li>
-        <li><strong>Markdown</strong> — <code>Q:</code>/<code>A:</code> blocks, <code>## Question</code> headings with the answer below, <code>term :: definition</code> lines, or two-column tables. <code>#hashtags</code> become tags.</li>
-        <li><strong>Recall JSON</strong> — a folder exported from Recall.</li>
+        <li><strong>JSON</strong> — download <a href="/import-templates/dummy.json" download="dummy.json">dummy.json</a>. An object with a <code>cards</code> array (or a bare array). Each card has <code>front</code>/<code>back</code> as <code>{`{ "text": "…" }`}</code> or a string, plus optional <code>tags</code>, <code>hint</code>, and <code>source</code>.</li>
+        <li><strong>CSV / TSV</strong> — download <a href="/import-templates/dummy.csv" download="dummy.csv">dummy.csv</a>. Header row <code>front,back,tags,hint,source</code> (names can be aliases such as question/answer). Quotes and multi-line cells are fine. Without a header, columns are positional: front, back, tags, hint, source.</li>
+        <li><strong>Markdown</strong> — download <a href="/import-templates/dummy.md" download="dummy.md">dummy.md</a>. <code>Q:</code>/<code>A:</code> blocks, <code>## Question</code> headings with the answer below, <code>term :: definition</code> lines, or two-column tables. <code>#hashtags</code> and a <code>tags:</code> line become tags.</li>
+        <li><strong>Anki</strong> — download <a href="/import-templates/dummy.txt" download="dummy.txt">dummy.txt</a> for the plain-text export, or use File → Export → Anki Deck Package (.apkg) with <em>Support older Anki versions</em> checked. Text is imported; images and audio are not.</li>
       </ul></details>
       {busy && !preview && <p className="import-status">Reading your file…</p>}
       {preview && <div className="import-preview">

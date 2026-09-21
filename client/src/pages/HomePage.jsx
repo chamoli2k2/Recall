@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, RotateCcw, Layers, Users, Brain, Globe2, LockKeyhole, Sparkles } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowRight, RotateCcw, Layers, Users, Brain, Globe2, LockKeyhole, Sparkles, Search } from 'lucide-react';
 import { api } from '../services/api';
 import { useLoad } from '../hooks/useApp';
-import { FolderIcon, Loading, Avatar } from '../components/ui';
+import { FolderIcon, Loading, Avatar, Empty } from '../components/ui';
+function matchesFolder(folder, query) {
+  if (!query) return true;
+  const hay = `${folder.title} ${folder.description} ${folder.tags?.join(' ') || ''} ${folder.owner?.username || ''}`.toLowerCase();
+  return hay.includes(query.toLowerCase());
+}
 const sample = [
   { front: 'What is spaced repetition?', back: 'Reviewing material at increasing intervals, right before you would forget it. Hard cards come back sooner; easy cards drift further out.', tag: 'learning' },
   { front: 'Why does active recall beat re-reading?', back: 'Retrieving an answer from memory strengthens the memory trace far more than passively recognising it on a page.', tag: 'memory' },
@@ -26,8 +31,11 @@ function PublicFolderCard({ folder }) {
   </Link>;
 }
 export default function HomePage() {
+  const [params, setParams] = useSearchParams();
+  const query = params.get('q') || '';
   const { data, loading } = useLoad(() => api('/folders?scope=explore').catch(() => ({ folders: [] })), []);
-  const folders = (data?.folders || []).slice(0, 6);
+  const all = data?.folders || [];
+  const folders = all.filter(f => matchesFolder(f, query));
   return <div className="home">
     <section className="home-hero">
       <div className="home-hero-copy">
@@ -42,9 +50,10 @@ export default function HomePage() {
     <section className="home-steps" aria-label="How Recall works">
       {[[Layers, 'Collect', 'Create folders for anything worth remembering. Add two-sided text or image cards, tags, hints, and sources.'], [Brain, 'Recall', 'Study what is due. Rate each answer honestly and Recall brings difficult cards back sooner.'], [Users, 'Share', 'Invite collaborators as viewers or editors, publish a collection to the world, or keep it just for you.']].map(([Icon, title, text], i) => <div className="home-step" key={title}><span className="home-step-index">0{i + 1}</span><span className="home-step-icon"><Icon size={20}/></span><h3>{title}</h3><p>{text}</p></div>)}
     </section>
-    <section className="home-community">
+    <section className="home-community" id="library">
       <div className="library-section-heading"><div><span className="eyebrow">THE COMMUNITY LIBRARY</span><h2>Public collections, ready to study</h2></div><Link to="/explore" className="text-button">Explore all <ArrowRight size={15}/></Link></div>
-      {loading ? <Loading/> : !folders.length ? <div className="home-empty"><Globe2 size={22}/><p>No public collections yet. Be the first — create an account and publish a folder.</p></div> : <div className="home-folder-grid">{folders.map(f => <PublicFolderCard folder={f} key={f.id}/>)}</div>}
+      <form className="home-search folder-search" onSubmit={e => e.preventDefault()}><Search size={16}/><input aria-label="Search public collections" placeholder="Search public collections…" value={query} onChange={e => setParams(e.target.value ? { q: e.target.value } : {})}/></form>
+      {loading ? <Loading/> : !folders.length ? query ? <Empty title="No matching collections" text="Try another word — titles, descriptions, tags, and authors are searchable without an account."/> : <div className="home-empty"><Globe2 size={22}/><p>No public collections yet. Be the first — create an account and publish a folder.</p></div> : <div className="home-folder-grid">{folders.map(f => <PublicFolderCard folder={f} key={f.id}/>)}</div>}
       <p className="home-community-note">Anyone can read and flip public cards. To save a collection, make a private copy, track progress, or create your own, you’ll need an account — it takes a few seconds.</p>
     </section>
     <section className="home-cta">

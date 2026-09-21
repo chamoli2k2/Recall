@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="Arial, Helvetica, sans-serif" xml:space="preserve">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1020"/><stop offset="1" stop-color="#141a33"/></linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#4f46e5"/></linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0ea5e9"/><stop offset="1" stop-color="#14b8a6"/></linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f59e0b"/><stop offset="1" stop-color="#f97316"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2340"/><stop offset="1" stop-color="#151b33"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <text x="56" y="58" font-size="30" font-weight="700" fill="#f8fafc">Real-time collaboration</text>
+  <text x="56" y="88" font-size="15" fill="#94a3b8">Three layers over Socket.IO. Sockets are observe-only. Every durable write is still an authorised HTTP request.</text>
+
+  <rect x="56" y="120" width="480" height="360" rx="20" fill="url(#panel)" stroke="#2a3357"/>
+  <rect x="56" y="120" width="480" height="8" rx="4" fill="url(#teal)"/>
+  <text x="80" y="166" font-size="18" font-weight="700" fill="#5eead4">1. Live updates</text>
+  <text x="80" y="196" font-size="14" fill="#cbd5e1">mutateFolder collects DomainEvents</text>
+  <text x="80" y="218" font-size="14" fill="#cbd5e1">during the MongoDB transaction.</text>
+  <text x="80" y="250" font-size="14" fill="#cbd5e1">The in-process bus publishes only</text>
+  <text x="80" y="272" font-size="14" fill="#cbd5e1">after commit. A rollback or 409</text>
+  <text x="80" y="294" font-size="14" fill="#cbd5e1">never reaches another client.</text>
+  <text x="80" y="326" font-size="14" fill="#cbd5e1">Socket.IO fans out folder:event</text>
+  <text x="80" y="348" font-size="14" fill="#cbd5e1">to room folder:&lt;id&gt;. Clients refetch.</text>
+  <text x="80" y="380" font-size="14" fill="#94a3b8">15 s polling only while disconnected.</text>
+  <text x="80" y="448" font-size="13" fill="#64748b">realtime/bus.js + accessService</text>
+
+  <rect x="560" y="120" width="480" height="360" rx="20" fill="url(#panel)" stroke="#2a3357"/>
+  <rect x="560" y="120" width="480" height="8" rx="4" fill="url(#violet)"/>
+  <text x="584" y="166" font-size="18" font-weight="700" fill="#c4b5fd">2. Presence</text>
+  <text x="584" y="196" font-size="14" fill="#cbd5e1">folder:join uses the same cookie and</text>
+  <text x="584" y="218" font-size="14" fill="#cbd5e1">accessFolder check as HTTP.</text>
+  <text x="584" y="250" font-size="14" fill="#cbd5e1">PresenceStore tracks who is in the</text>
+  <text x="584" y="272" font-size="14" fill="#cbd5e1">folder and which card they edit.</text>
+  <text x="584" y="304" font-size="14" fill="#cbd5e1">Membership changes re-check every</text>
+  <text x="584" y="326" font-size="14" fill="#cbd5e1">socket. Revoked users get</text>
+  <text x="584" y="348" font-size="14" fill="#cbd5e1">folder:revoked and leave the room.</text>
+  <text x="584" y="380" font-size="14" fill="#94a3b8">Anonymous sockets: global folders only.</text>
+  <text x="584" y="448" font-size="13" fill="#64748b">realtime/presence.js</text>
+
+  <rect x="1064" y="120" width="480" height="360" rx="20" fill="url(#panel)" stroke="#2a3357"/>
+  <rect x="1064" y="120" width="480" height="8" rx="4" fill="url(#amber)"/>
+  <text x="1088" y="166" font-size="18" font-weight="700" fill="#fbbf24">3. CRDT co-editing</text>
+  <text x="1088" y="196" font-size="14" fill="#cbd5e1">Each card side is a Y.Text in a Y.Doc.</text>
+  <text x="1088" y="218" font-size="14" fill="#cbd5e1">DocStore holds open documents,</text>
+  <text x="1088" y="240" font-size="14" fill="#cbd5e1">relays updates and awareness,</text>
+  <text x="1088" y="262" font-size="14" fill="#cbd5e1">persists to CardDoc on debounce.</text>
+  <text x="1088" y="294" font-size="14" fill="#cbd5e1">CodeMirror 6 + y-codemirror.next</text>
+  <text x="1088" y="316" font-size="14" fill="#cbd5e1">shows coloured remote cursors.</text>
+  <text x="1088" y="348" font-size="14" fill="#cbd5e1">Save still PATCH /cards/:id so the</text>
+  <text x="1088" y="370" font-size="14" fill="#cbd5e1">versioned Card stays source of truth.</text>
+  <text x="1088" y="402" font-size="14" fill="#94a3b8">Stale CRDT is re-seeded from the card.</text>
+  <text x="1088" y="448" font-size="13" fill="#64748b">realtime/docs.js + CardDoc</text>
+
+  <rect x="56" y="510" width="1488" height="350" rx="20" fill="url(#panel)" stroke="#2a3357"/>
+  <text x="80" y="556" font-size="18" font-weight="700" fill="#f1f5f9">Write path stays HTTP</text>
+  <text x="80" y="586" font-size="14" fill="#cbd5e1">Editor A and Editor B type into the same Y.Doc. Updates merge without a conflict dialog.</text>
+  <text x="80" y="612" font-size="14" fill="#cbd5e1">When either clicks Save, PATCH /cards/:id runs mutateFolder: ACL, writeEpoch, version, Revision, Activity, outbox.</text>
+  <text x="80" y="638" font-size="14" fill="#cbd5e1">After commit the bus emits card.updated with the new version so open editors stay current instead of hitting 409 on metadata.</text>
+
+  <rect x="80" y="670" width="330" height="150" rx="14" fill="#0f1530" stroke="#3b3f6b"/>
+  <text x="100" y="704" font-weight="700" fill="#e2e8f0">Browser A</text>
+  <text x="100" y="730" fill="#94a3b8" font-size="13">CodeMirror + Yjs</text>
+  <text x="100" y="752" fill="#94a3b8" font-size="13">doc:update / awareness</text>
+  <text x="100" y="774" fill="#94a3b8" font-size="13">PATCH card + version</text>
+
+  <rect x="460" y="670" width="330" height="150" rx="14" fill="#0f1530" stroke="#3b3f6b"/>
+  <text x="480" y="704" font-weight="700" fill="#e2e8f0">Express + Socket.IO</text>
+  <text x="480" y="730" fill="#94a3b8" font-size="13">relay Yjs, never mutate</text>
+  <text x="480" y="752" fill="#94a3b8" font-size="13">HTTP write = mutateFolder</text>
+  <text x="480" y="774" fill="#94a3b8" font-size="13">publish after commit only</text>
+
+  <rect x="840" y="670" width="330" height="150" rx="14" fill="#0f1530" stroke="#3b3f6b"/>
+  <text x="860" y="704" font-weight="700" fill="#e2e8f0">Browser B</text>
+  <text x="860" y="730" fill="#94a3b8" font-size="13">same Y.Doc, other cursor</text>
+  <text x="860" y="752" fill="#94a3b8" font-size="13">folder:event refetch</text>
+  <text x="860" y="774" fill="#94a3b8" font-size="13">local version updated</text>
+
+  <rect x="1220" y="670" width="292" height="150" rx="14" fill="#122a2a" stroke="#14b8a6"/>
+  <text x="1240" y="704" font-weight="700" fill="#bbf7d0">MongoDB</text>
+  <text x="1240" y="730" fill="#cbd5e1" font-size="13">Card (source of truth)</text>
+  <text x="1240" y="752" fill="#cbd5e1" font-size="13">CardDoc (CRDT snapshot)</text>
+  <text x="1240" y="774" fill="#cbd5e1" font-size="13">Revision + DomainEvent</text>
+
+  <path d="M410 745 H460" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M790 745 H840" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M1170 745 H1220" stroke="#5eead4" stroke-width="2" marker-end="url(#arrow)"/>
+</svg>
