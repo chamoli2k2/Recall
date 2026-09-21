@@ -28,6 +28,9 @@ r.patch('/folders/:id/save', requireAuth, validate(z.object({ saved: z.boolean()
 r.get('/folders/:id/activity', a(folders.activity));
 r.get('/folders/:id/cards', a(cards.list)); r.post('/folders/:id/cards', requireAuth, validate(cardSchema), a(cards.create));
 r.post('/folders/:id/images', requireAuth, rateLimit({ windowMs: 60000, limit: 20 }), upload.single('image'), a(cards.upload));
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
+r.post('/folders/:id/import', requireAuth, rateLimit({ windowMs: 60000, limit: 10 }), importUpload.single('file'), a(cards.importFile));
+r.get('/folders/:id/export', requireAuth, a(cards.exportFile));
 r.patch('/cards/:id', requireAuth, validate(cardSchema.extend({ version: z.number().int().min(0) })), a(cards.update));
 r.delete('/cards/:id', requireAuth, a(cards.remove)); r.get('/cards/:id/revisions', requireAuth, a(cards.revisions));
 r.patch('/cards/:id/bookmark', requireAuth, validate(z.object({ bookmarked: z.boolean() })), a(cards.bookmark));

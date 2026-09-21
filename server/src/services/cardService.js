@@ -3,6 +3,7 @@ import { accessFolder, mutateFolder, recordEvent } from './accessService.js';
 import { assert } from '../utils/errors.js';
 import { previewSchedule } from './studyService.js';
 import { currentRetrievability, DEFAULT_RETENTION } from './fsrs.js';
+import { MAX_CARDS } from './importService.js';
 export async function listCards(folderId, user) {
   await accessFolder(folderId, user);
   const cards = await Card.find({ folder: folderId }).sort({ createdAt: 1 });
@@ -23,6 +24,20 @@ export async function createCard(folderId, user, body) {
     const [card] = await Card.create([{ ...body, folder: folder.id, createdBy: user.id, updatedBy: user.id }], { session });
     await recordEvent(folder, user, 'card.created', body.front.text.slice(0, 100) || 'Image card', session, card.id); return card;
   });
+}
+/** Bulk insert already-parsed cards in one transaction; one activity event summarises the import. */
+export async function importCards(folderId, user, cards, { extraTags = [] } = {}) {
+  assert(cards.length, 400, 'No cards were found in that file.'); assert(cards.length <= MAX_CARDS, 400, `Import at most ${MAX_CARDS} cards at a time.`);
+  return mutateFolder(folderId, user, 'editor', async (folder, session) => {
+    assert(!folder.archived, 409, 'Restore this folder before adding cards.');
+    const docs = cards.map(c => ({ ...c, tags: [...new Set([...c.tags, ...extraTags])].slice(0, 10), folder: folder.id, createdBy: user.id, updatedBy: user.id }));
+    const created = await Card.insertMany(docs, { session });
+    await recordEvent(folder, user, 'cards.imported', `${created.length} cards imported`, session, folder.id, { count: created.length }); return created;
+  });
+}
+export async function exportCards(folderId, user) {
+  const folder = await accessFolder(folderId, user); const cards = await Card.find({ folder: folder.id }).sort({ createdAt: 1 });
+  return { folder, cards: cards.map(c => ({ front: { text: c.front.text }, back: { text: c.back.text }, tags: c.tags, hint: c.hint, source: c.source })) };
 }
 export async function updateCard(id, user, body) {
   const current = await Card.findById(id); assert(current, 404, 'Card not found.');
