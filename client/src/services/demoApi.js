@@ -1,0 +1,46 @@
+import { uuid } from './uuid';
+import { sampleFolders } from '../../../shared/sampleData';
+const user = { id: 'demo-user', username: 'gaurav', name: 'Gaurav Prakash', bio: 'Learning something new, one card at a time.', dailyGoal: 20, savedFolders: [] };
+const collaborators = [{ id: 'demo-alex', name: 'Alex Morgan', username: 'alex' }, { id: 'demo-maya', name: 'Maya Chen', username: 'maya' }];
+let folders = sampleFolders.map((f, i) => ({ ...f, cards: undefined, id: `folder-${i}`, owner: i === 4 ? collaborators[1] : user, role: i === 4 ? 'viewer' : 'owner', version: 0, members: i === 0 ? [{ user: collaborators[0], role: 'editor' }] : [], memberCount: i === 0 ? 2 : 1, archived: false, cardCount: f.cards.length, createdAt: new Date().toISOString(), updatedAt: new Date(Date.now() - i * 3600000).toISOString() }));
+let cards = sampleFolders.flatMap((f, i) => f.cards.map(([front, back, tags], j) => ({ id: `card-${i}-${j}`, folder: `folder-${i}`, front: { text: front }, back: { text: back }, tags, hint: '', source: '', version: 0, progress: { version: 0, repetitions: 0, interval: 0, bookmarked: false, dueAt: null } })));
+let reviews = [], activity = [], revisions = {}, images = {};
+const clone = x => structuredClone(x);
+const error = message => { throw new Error(message); };
+export async function demoRequest(path, options = {}) {
+  const method = options.method || 'GET'; const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body || {};
+  const parts = path.split('?')[0].split('/').filter(Boolean); const [entity, id, action] = parts;
+  if (path === '/auth/me') return { user: clone(user) };
+  if (entity === 'users') { const profile = [user, ...collaborators].find(u => u.username === id); if (!profile) error('User not found.'); return { profile: clone(profile), folders: clone(folders.filter(f => f.owner.id === profile.id && f.visibility === 'global' && !f.archived)) }; }
+  if (path === '/auth/profile') { Object.assign(user, body); return { user: clone(user) }; }
+  if (path.startsWith('/auth/')) error('This preview uses a sample account. Run the full app to create real accounts.');
+  if (path === '/stats') return { stats: { totalCards: cards.length, due: cards.filter(c => !c.progress?.dueAt || new Date(c.progress.dueAt) <= new Date()).length, reviewed: reviews.length, reviewsToday: reviews.length, mastered: cards.filter(c => c.progress.interval >= 21).length, goal: user.dailyGoal } };
+  if (entity === 'folders') {
+    if (!id && method === 'GET') return { folders: clone(folders.filter(f => !f.archived && (!path.includes('explore') || f.visibility === 'global'))) };
+    if (id === 'archived') return { folders: clone(folders.filter(f => f.archived)) };
+    if (!id && method === 'POST') { const folder = { ...body, id: uuid(), owner: clone(user), role: 'owner', members: [], memberCount: 1, cardCount: 0, version: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; folders.unshift(folder); return { folder: clone(folder) }; }
+    const folder = folders.find(f => f.id === id); if (!folder) error('Folder not found.');
+    if (action === 'cards' && method === 'GET') return { cards: clone(cards.filter(c => c.folder === id)) };
+    if (action === 'activity') return { activity: clone(activity.filter(a => a.folder === id)) };
+    if (!action && method === 'GET') return { folder: clone(folder) };
+    if (action === 'save') { folder.saved = body.saved; return { ok: true }; }
+    if (action === 'copy') { const copy = { ...clone(folder), id: uuid(), title: `${folder.title} (copy)`, owner: clone(user), role: 'owner', members: [], visibility: 'private', version: 0, originalCreator: folder.owner.username }; folders.unshift(copy); cards.push(...cards.filter(c => c.folder === id).map(c => ({ ...clone(c), id: uuid(), folder: copy.id, progress: { version: 0, interval: 0, repetitions: 0, bookmarked: false } }))); return { folder: clone(copy) }; }
+    if (folder.role !== 'owner' && folder.role !== 'editor') error('This folder is read-only. Make a copy to edit it.');
+    if (action === 'images') { const file = body.get('image'); const imageId = uuid(); images[imageId] = URL.createObjectURL(file); return { id: imageId, url: images[imageId] }; }
+    if (action === 'members') { if (folder.role !== 'owner') error('Only the owner can manage access.'); const target = collaborators.find(c => c.username === body.username.replace('@', '')); if (!target) error('In this preview, try @alex or @maya. Real invitations require the backend.'); folder.members = folder.members.filter(m => m.user.id !== target.id); if (body.role !== 'remove') folder.members.push({ user: target, role: body.role }); folder.memberCount = folder.members.length + 1; folder.version++; return { folder: clone(folder) }; }
+    if (action === 'archive') { folder.archived = body.archived; return { ok: true }; }
+    if (action === 'cards' && method === 'POST') { const card = { ...body, id: uuid(), folder: id, version: 0, progress: { version: 0, repetitions: 0, interval: 0 } }; cards.push(card); folder.cardCount++; activity.unshift({ id: uuid(), folder: id, actor: clone(user), action: 'card.created', detail: body.front.text || 'Image card', createdAt: new Date().toISOString() }); return { card: clone(card) }; }
+    if (!action && method === 'PATCH') { if (body.version !== folder.version) error('This folder changed. Please refresh.'); Object.assign(folder, body, { version: folder.version + 1 }); return { folder: clone(folder) }; }
+  }
+  if (entity === 'cards') {
+    const card = cards.find(c => c.id === id); if (!card) error('Card not found.');
+    if (action === 'revisions') return { revisions: clone(revisions[id] || []) };
+    if (action === 'bookmark') { card.progress.bookmarked = body.bookmarked; return { ok: true }; }
+    const folder = folders.find(f => f.id === card.folder); if (!['owner', 'editor'].includes(folder.role)) error('This folder is read-only.');
+    if (method === 'DELETE') { cards = cards.filter(c => c.id !== id); folder.cardCount--; return { ok: true }; }
+    if (method === 'PATCH') { if (body.version !== card.version) error('This card changed. Reopen it to see the latest version.'); (revisions[id] ||= []).unshift({ id: uuid(), version: card.version, snapshot: clone(card), editor: clone(user), createdAt: new Date().toISOString() }); Object.assign(card, body, { version: card.version + 1 }); return { card: clone(card) }; }
+  }
+  if (entity === 'reviews') { const existing = reviews.find(r => r.requestId === body.requestId); if (existing) return { progress: clone(existing.result) }; const card = cards.find(c => c.id === body.cardId); if (body.version !== card.progress.version) error('This card has already been reviewed.'); const interval = { again: 0, hard: 1, good: Math.max(1, (card.progress.interval || 0) * 2), easy: Math.max(4, (card.progress.interval || 0) * 3) }[body.rating]; Object.assign(card.progress, { version: card.progress.version + 1, repetitions: body.rating === 'again' ? 0 : card.progress.repetitions + 1, interval, dueAt: new Date(Date.now() + (interval ? interval * 86400000 : 600000)).toISOString() }); reviews.push({ ...body, result: clone(card.progress) }); return { progress: clone(card.progress) }; }
+  error('This action is not available.');
+}
+export const demoImage = id => images[id];

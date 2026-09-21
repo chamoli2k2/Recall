@@ -1,0 +1,54 @@
+import { Folder, Card, User, Media, Revision } from '../models/index.js';
+import { accessFolder, mutateFolder, recordEvent, roleOf } from './accessService.js';
+import { assert } from '../utils/errors.js';
+const populate = [{ path: 'owner', select: 'name username' }, { path: 'members.user', select: 'name username' }];
+export async function presentFolder(folder, user) {
+  await folder.populate(populate);
+  const count = await Card.countDocuments({ folder: folder.id });
+  const tags = (await Card.distinct('tags', { folder: folder._id })).slice(0, 10);
+  const json = folder.toJSON(); delete json.writeEpoch;
+  const role = roleOf(folder, user);
+  // Public readers see counts, never a list of private invitees.
+  if (role !== 'owner' && !folder.members.some(m => String(m.user._id) === String(user?._id))) json.members = [];
+  return { ...json, role, tags, cardCount: count, memberCount: folder.members.length + 1, saved: !!user?.savedFolders?.some(id => String(id) === folder.id) };
+}
+export async function listFolders(user, scope) {
+  const filter = scope === 'explore' ? { visibility: 'global', archived: false } : { archived: false, $or: [{ owner: user._id }, { 'members.user': user._id }, { _id: { $in: user.savedFolders }, visibility: 'global' }] };
+  const folders = await Folder.find(filter).sort({ updatedAt: -1 }).limit(200);
+  return Promise.all(folders.map(f => presentFolder(f, user)));
+}
+export async function createFolder(user, body) { return Folder.create({ ...body, owner: user.id }); }
+export async function updateFolder(id, user, body) {
+  return mutateFolder(id, user, 'owner', async (folder, session) => {
+    assert(folder.version === body.version, 409, 'This folder changed. Refresh and try again.', 'VERSION_CONFLICT');
+    const { version, ...changes } = body; Object.assign(folder, changes); folder.version += 1;
+    await folder.save({ session }); await recordEvent(folder, user, 'folder.updated', folder.title, session); return folder;
+  });
+}
+export async function setMember(id, user, username, role) {
+  return mutateFolder(id, user, 'owner', async (folder, session) => {
+    const target = await User.findOne({ username }).session(session); assert(target, 404, 'No user with that username. Ask them to create an account first.');
+    assert(target.id !== String(folder.owner), 400, 'The owner already has full access.');
+    folder.members = folder.members.filter(m => String(m.user) !== target.id);
+    if (role !== 'remove') folder.members.push({ user: target.id, role });
+    folder.version += 1; await folder.save({ session }); await recordEvent(folder, user, 'folder.members.changed', role === 'remove' ? `Removed @${username}` : `Added @${username} as ${role}`, session); return folder;
+  });
+}
+export async function copyFolder(id, user) {
+  return mutateFolder(id, user, 'viewer', async (source, session) => {
+    const author = await User.findById(source.owner).session(session);
+    const [copy] = await Folder.create([{ title: `${source.title} (copy)`, description: source.description, color: source.color, icon: source.icon, owner: user.id, visibility: 'private', copiedFrom: source.id, originalCreator: source.originalCreator || author.username }], { session });
+    const cards = await Card.find({ folder: source.id }).session(session);
+    const imageMap = new Map();
+    for (const card of cards) {
+      const data = card.toObject(); delete data._id; delete data.__v; delete data.createdAt; delete data.updatedAt;
+      for (const side of ['front', 'back']) if (data[side]?.image) {
+        const key = String(data[side].image);
+        if (!imageMap.has(key)) { const original = await Media.findById(key).select('+data').session(session); if (original) { const [image] = await Media.create([{ folder: copy.id, uploadedBy: user.id, data: original.data, name: original.name, contentType: original.contentType }], { session }); imageMap.set(key, image.id); } }
+        data[side].image = imageMap.get(key) ?? null;
+      }
+      await Card.create([{ ...data, folder: copy.id, version: 0, createdBy: user.id, updatedBy: user.id }], { session });
+    }
+    await recordEvent(copy, user, 'folder.copied', copy.title, session); return copy;
+  });
+}

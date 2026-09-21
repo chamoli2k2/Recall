@@ -1,0 +1,7 @@
+# Recall external health ping — every 5 minutes from a machine that is NOT the Recall host.
+# Install:  crontab -e   then paste the two lines below (adjust the paths and URL).
+# Logs:     tail -f ~/recall-healthcheck.log
+# The scheduler keeps running while Recall sleeps; the request wakes an idle host. It does not
+# guarantee uptime and does not bypass hosting usage limits.
+HEALTHCHECK_URL=https://recall.example.com/api/health
+*/5 * * * * /usr/bin/env node /path/to/Recall/scripts/healthcheck.js >> "$HOME/recall-healthcheck.log" 2>&1

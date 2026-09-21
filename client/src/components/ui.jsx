@@ -1,0 +1,15 @@
+import * as Dialog from '@radix-ui/react-dialog';
+import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { useId, cloneElement, isValidElement } from 'react';
+import { X, MoreHorizontal, Layers, Code2, Globe2, Brain, BookOpen, FlaskConical, Terminal, Palette, Loader2, FolderOpen } from 'lucide-react';
+export const icons = { layers: Layers, code: Code2, globe: Globe2, brain: Brain, book: BookOpen, flask: FlaskConical, terminal: Terminal, palette: Palette };
+export function FolderIcon({ name = 'layers', ...props }) { const Icon = icons[name] || Layers; return <Icon {...props}/>; }
+export function Modal({ title, description, children, open, onClose, wide }) { return <Dialog.Root open={open} onOpenChange={v => !v && onClose()}><Dialog.Portal><Dialog.Overlay className="modal-overlay"/><Dialog.Content className={`modal ${wide ? 'modal-wide' : ''}`}><div className="modal-head"><div><Dialog.Title>{title}</Dialog.Title><Dialog.Description>{description}</Dialog.Description></div><Dialog.Close className="icon-button" aria-label="Close dialog"><X size={20}/></Dialog.Close></div>{children}</Dialog.Content></Dialog.Portal></Dialog.Root>; }
+export function Menu({ items, label = 'More options' }) { return <Dropdown.Root><Dropdown.Trigger className="icon-button" aria-label={label} onClick={e => e.stopPropagation()}><MoreHorizontal size={20}/></Dropdown.Trigger><Dropdown.Portal><Dropdown.Content className="dropdown" sideOffset={6} align="end">{items.filter(Boolean).map((item, i) => <Dropdown.Item className={item.danger ? 'danger' : ''} key={i} onSelect={item.action}>{item.icon}{item.label}</Dropdown.Item>)}</Dropdown.Content></Dropdown.Portal></Dropdown.Root>; }
+export function Avatar({ user, small = false }) { return <span className={`avatar ${small ? 'small' : ''}`} title={user?.name}>{(user?.name || 'You').split(' ').map(w => w[0]).slice(0, 2).join('')}</span>; }
+export function Empty({ title, text, action }) { return <div className="empty-state"><span className="empty-icon"><FolderOpen size={30}/></span><h3>{title}</h3><p>{text}</p>{action}</div>; }
+export function Loading() { return <div className="loading"><Loader2 className="spin" size={23}/> Loading your space…</div>; }
+export function ErrorState({ message }) { return <div className="error-panel" role="alert">{message}</div>; }
+export function Button({ children, loading, className = '', ...props }) { return <button className={`button ${className}`} disabled={loading || props.disabled} {...props}>{loading && <Loader2 className="spin" size={17}/>} {children}</button>; }
+export function Field({ label, children, hint }) { const id = useId(); const direct = isValidElement(children) && ['input', 'textarea', 'select'].includes(children.type); return <div className="field">{direct ? <label htmlFor={id}>{label}</label> : <span id={id}>{label}</span>}{direct ? cloneElement(children, { id, 'aria-describedby': hint ? `${id}-hint` : undefined }) : <div role="group" aria-labelledby={id}>{children}</div>}{hint && <small id={`${id}-hint`}>{hint}</small>}</div>; }
+export function Tag({ children }) { return <span className="tag">{children}</span>; }

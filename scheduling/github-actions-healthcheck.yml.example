@@ -1,0 +1,25 @@
+# Example GitHub Actions schedule. It is NOT active from this folder: copy it to
+# .github/workflows/healthcheck.yml in a repository whose Actions you control, and add the
+# HEALTHCHECK_URL repository variable (Settings → Secrets and variables → Actions → Variables).
+# GitHub may delay or skip scheduled runs on busy periods and disables schedules on inactive
+# repositories, so treat this as best-effort, not an uptime guarantee.
+name: Recall health ping
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/healthcheck.js
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/healthcheck.js
+        env:
+          HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL }}

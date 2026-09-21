@@ -1,0 +1,9 @@
+# Copy to ~/.config/systemd/user/ (or /etc/systemd/system/) together with recall-healthcheck.timer.
+# Then: systemctl --user daemon-reload && systemctl --user enable --now recall-healthcheck.timer
+[Unit]
+Description=Recall external health ping (one shot)
+
+[Service]
+Type=oneshot
+Environment=HEALTHCHECK_URL=https://recall.example.com/api/health
+ExecStart=/usr/bin/env node /path/to/Recall/scripts/healthcheck.js

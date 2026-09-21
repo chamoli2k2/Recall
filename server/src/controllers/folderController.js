@@ -1,0 +1,13 @@
+import { Folder, User, Activity } from '../models/index.js';
+import * as folders from '../services/folderService.js';
+import { accessFolder, mutateFolder, recordEvent } from '../services/accessService.js';
+export const list = async (req, res) => res.json({ folders: await folders.listFolders(req.user, req.query.scope) });
+export const get = async (req, res) => res.json({ folder: await folders.presentFolder(await accessFolder(req.params.id, req.user), req.user) });
+export const create = async (req, res) => res.status(201).json({ folder: await folders.presentFolder(await folders.createFolder(req.user, req.body), req.user) });
+export const update = async (req, res) => res.json({ folder: await folders.presentFolder(await folders.updateFolder(req.params.id, req.user, req.body), req.user) });
+export const member = async (req, res) => res.json({ folder: await folders.presentFolder(await folders.setMember(req.params.id, req.user, req.body.username, req.body.role), req.user) });
+export const copy = async (req, res) => res.status(201).json({ folder: await folders.presentFolder(await folders.copyFolder(req.params.id, req.user), req.user) });
+export const archive = async (req, res) => { await mutateFolder(req.params.id, req.user, 'owner', async (folder, session) => { folder.archived = req.body.archived; folder.version++; await folder.save({ session }); await recordEvent(folder, req.user, 'folder.archived', folder.title, session); }); res.json({ ok: true }); };
+export const archived = async (req, res) => { const data = await Folder.find({ owner: req.user.id, archived: true }).sort({ updatedAt: -1 }); res.json({ folders: await Promise.all(data.map(f => folders.presentFolder(f, req.user))) }); };
+export const save = async (req, res) => { await accessFolder(req.params.id, req.user); await User.updateOne({ _id: req.user.id }, req.body.saved ? { $addToSet: { savedFolders: req.params.id } } : { $pull: { savedFolders: req.params.id } }); res.json({ ok: true }); };
+export const activity = async (req, res) => { const folder = await accessFolder(req.params.id, req.user); const isMember = String(folder.owner) === req.user?.id || folder.members.some(m => String(m.user) === req.user?.id); res.json({ activity: isMember ? await Activity.find({ folder: folder.id }).sort({ createdAt: -1 }).limit(30).populate('actor', 'name username') : [] }); };
