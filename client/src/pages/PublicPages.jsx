@@ -4,7 +4,8 @@ import { ArrowLeft, ArrowRight, Globe2, RotateCcw } from 'lucide-react';
 import { api, imageUrl } from '../services/api';
 import { useLoad } from '../hooks/useApp';
 import { Avatar, FolderIcon, Loading, ErrorState, Tag, Empty } from '../components/ui';
-export function PublicShell({ children }) { return <div className="public-page"><header><Link className="brand" to="/"><img src="/favicon.svg" alt=""/>recall.</Link><Link className="button primary" to="/">Sign in to your space <ArrowRight size={16}/></Link></header><main>{children}</main></div>; }
+import ThemeToggle from '../components/ThemeToggle';
+export function PublicShell({ children }) { return <div className="public-page"><header><Link className="brand" to="/"><img src="/favicon.svg" alt=""/>recall.</Link><div className="public-header-actions"><ThemeToggle/><Link className="button primary" to="/">Sign in to your space <ArrowRight size={16}/></Link></div></header><main>{children}</main></div>; }
 export function PublicFolderPage() {
   const { id } = useParams(); const { data, loading, error } = useLoad(() => Promise.all([api(`/folders/${id}`), api(`/folders/${id}/cards`)]).then(([f, c]) => ({ ...f, ...c })), [id]); const [flipped, setFlipped] = useState({});
   if (loading) return <Loading/>; if (error) return <Empty title="This collection isn’t available" text="It may be private. Sign in with an invited account to open it." action={<Link className="button primary" to="/">Sign in</Link>}/>;

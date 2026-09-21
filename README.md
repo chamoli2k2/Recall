@@ -14,6 +14,7 @@ A collaborative flashcard application built with **React, Express, and MongoDB**
 - Quick review, due-card study, review scheduling, daily goals, personal progress, and keyboard shortcuts.
 - Archive and restore folders; confirmed permanent deletion of individual cards.
 - Permission-checked image delivery. Images are decoded, resized, stripped of metadata, and stored in MongoDB.
+- Light and dark themes. The toggle in the top bar (and on the sign-in and public pages) saves the choice in `localStorage`; with no saved choice the app follows the OS preference. `public/theme.js` applies the theme before first paint, as a file rather than inline because the CSP forbids inline scripts.
 
 ## Preview versus the full application
 
