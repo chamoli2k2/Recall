@@ -34,6 +34,23 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | GET | `/health` | Liveness: Express is running. Public, no database access, always 200 |
 | GET | `/ready` | Readiness: MongoDB answers a ping within `READINESS_TIMEOUT_MS`. 200 ready / 503 unavailable; no error details |
 
+## Realtime (Socket.IO, same origin, path `/socket.io`)
+
+The socket authenticates from the `recall_session` cookie during the handshake; the `Origin` header must be same-origin or in `CLIENT_ORIGIN`. Sockets are observe-only: no event mutates data. Every write still goes through the HTTP routes above.
+
+| Direction | Event | Payload / purpose |
+| --- | --- | --- |
+| client → server | `folder:join` (folderId, ack) | Reader permission. Ack `{ ok, presence, version }` or `{ ok: false, error }` |
+| client → server | `folder:leave` (folderId) | Leave the room |
+| client → server | `card:editing` (folderId, cardId or null) | Advisory "I am editing this card" for presence |
+| client → server | `doc:join` (cardId, ack) | Editor permission. Ack `{ ok, state, version }` where `state` is the Yjs document update |
+| client → server | `doc:update` (cardId, update) / `doc:awareness` (cardId, update) | Yjs document and cursor updates; relayed to other editors |
+| client → server | `doc:leave` (cardId) | Release the document |
+| server → client | `presence` (folderId, list) | `[{ user, color, editing, tabs }]` for everyone signed in and viewing |
+| server → client | `folder:event` (event) | `{ type, folderId, aggregateId, detail, actor, at, version? }` after a transaction commits |
+| server → client | `folder:revoked` (folderId) | Caller lost access; they were removed from the room and its documents |
+| server → client | `doc:update`, `doc:awareness`, `doc:peer-joined`, `doc:peer-left` | Co-editing relay |
+
 ## Create a card
 
 ```json

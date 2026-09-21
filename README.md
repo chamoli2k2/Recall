@@ -8,8 +8,8 @@ A collaborative flashcard application built with **React, Express, and MongoDB**
 - Private and global folders; every card belongs to exactly one folder.
 - Two-sided text and image cards, tags, hints, source links, bookmarks, search, and per-tab drafts.
 - Sharing with existing users by username, with owner/editor/viewer permissions.
-- Collaborative editing with version conflict detection, change history, and restoration into a new draft.
-- Folder activity and polling for committed changes every 15 seconds while viewing a folder.
+- Real-time collaboration in the Google Docs style: live presence (who is viewing, who is editing which card), instant push of committed changes to everyone in the folder, and simultaneous character-level co-editing of a card's text with coloured remote cursors, built on Yjs CRDTs over Socket.IO. See [Collaboration model](#collaboration-model).
+- Version conflict detection, change history, and restoration into a new draft still protect every save; polling every 15 seconds remains as a fallback when the socket is disconnected.
 - Global discovery, public profiles, anonymous public-card viewing, saved collections, and private copies.
 - A public home page at `/` for signed-out visitors: interactive sample card, how-it-works, live public collections, and clear sign-in/sign-up paths (`/login`, `/signup`). Anonymous visitors can read and flip public cards but cannot create, edit, save, or copy — the API enforces this, not just the UI.
 - Quick review, due-card study, review scheduling, daily goals, personal progress, and keyboard shortcuts.
@@ -184,7 +184,15 @@ users ──< folders ──< cards ──< revisions
 
 ### Collaboration model
 
-Conflict-aware editing with polling, deliberately not CRDTs or live cursors. While a folder is open, the client refetches every 15 seconds (paused when the tab is hidden or an editor modal is open). Writes are last-writer-wins *only if* the version matches; otherwise the user sees a conflict and their draft is preserved in `sessionStorage`. The `Activity` feed gives a human-readable audit trail. This is the right cost/benefit for flashcards: edits are short, rare, and card-scoped, so operational transforms would add complexity without user-visible benefit.
+Three layers, each building on the previous one. Everything lives in `server/src/realtime/` and `client/src/hooks/useRealtime.js`; the HTTP write path is unchanged.
+
+1. **Live updates (read-side projection of committed events).** `mutateFolder` collects domain events during the MongoDB transaction and publishes them on an in-process bus (`realtime/bus.js`) *only after the transaction commits*. A Socket.IO server fans each event out to the `folder:<id>` room. A rolled-back or version-conflicted write therefore never reaches another client, and a retried transaction cannot double-publish because collection is reset per attempt. Clients refetch on each event; polling every 15 s runs only while the socket is disconnected.
+2. **Presence and awareness.** Joining a room goes through the same `accessFolder` check as HTTP, authenticated from the same HttpOnly cookie; anonymous sockets can watch only public folders. `PresenceStore` keeps who is in each folder and which card they are editing (advisory, never blocking). Membership changes re-run the access check for every socket in the room and eject revoked users from the room and from any open documents (`folder:revoked`).
+3. **Simultaneous text editing (CRDT).** Each card side is a `Y.Text` in a Yjs document. The server holds one `Y.Doc` per open card (`DocStore`), relays updates and cursor awareness between editors, and persists the CRDT state to `CardDoc` (debounced, and on eviction when the last editor leaves). CodeMirror 6 with `y-codemirror.next` renders remote cursors and selections in each collaborator's colour. Yjs guarantees convergence: concurrent inserts at different positions merge without a conflict dialog. A `Card` is only ever changed by the normal `PATCH /cards/:id`, so **the versioned `Card` document remains the source of truth**: saving writes the merged text with the current version, bumps it, and records a `Revision` — history, restore, and permissions all keep working. If a card is edited while nobody is co-editing (solo or offline), the persisted CRDT state is older than `card.updatedAt` and the document is re-seeded from the card, so a stale CRDT never overwrites a newer edit.
+
+What version conflicts mean now: text no longer conflicts (the CRDT merges it), but the `version` still guards metadata such as tags and images, and the live `card.updated` event carries the new version so open editors stay current instead of hitting `409`.
+
+Sockets are observe-only. No mutation is accepted over the WebSocket — every write is an authorised, transactional HTTP request, which keeps one code path for authorisation, validation, idempotency, and auditing. `scripts/collab-peer.js` simulates a second collaborator from the terminal for demos.
 
 ### Spaced repetition
 
@@ -220,9 +228,10 @@ The `DomainEvent` collection is a **transactional outbox**: every write appends 
 | --- | --- | --- |
 | Monolith, same origin | Zero CORS/cookie complexity, one deploy, one health check | Split static assets to a CDN; keep API monolith |
 | Images in MongoDB | No extra service; ACL check is one query | S3/GCS + signed URLs, keep metadata in Mongo |
-| Polling every 15 s | Trivial, stateless, works through any proxy | SSE or WebSockets fed by the outbox |
+| Socket.IO rooms and presence in process memory | Single instance; zero extra infrastructure; falls back to 15 s polling | `@socket.io/redis-adapter` plus a shared presence store when running more than one replica |
+| Yjs documents held in server memory while a card is open | Only open cards cost memory; state is persisted on eviction | Move `DocStore` to a dedicated realtime service (e.g. Hocuspocus/y-redis) if thousands of cards are open concurrently |
 | In-process rate limiter | No Redis | Redis store or edge/WAF rate limiting |
-| Optimistic versioning | Lock-free, matches edit frequency | Field-level merges or CRDT only if simultaneous editing becomes a requirement |
+| Optimistic versioning for metadata, CRDT for text | Text merges automatically; version still guards tags/images | Field-level CRDT for the whole card if metadata conflicts become common |
 | Transactions on every write | Correctness first; write volume is low | Partition hot folders; reads already avoid transactions |
 | Opaque sessions in Mongo | Instant revocation, simple | Redis session cache in front of Mongo |
 | 200-folder list cap, no cursor pagination | Personal libraries are small | Cursor pagination on `(updatedAt, _id)` |

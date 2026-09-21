@@ -21,5 +21,7 @@ revision.index({ card: 1, version: 1 }, { unique: true });
 // Durable domain events are the future integration boundary. No AI calls or indexing run in v1.
 const event = new Schema({ type: String, aggregateId: String, payload: Schema.Types.Mixed, processedAt: Date }, options);
 event.index({ processedAt: 1, createdAt: 1 });
-export const User = model('User', user), Session = model('Session', session), Folder = model('Folder', folder), Card = model('Card', card), Media = model('Media', media), Progress = model('Progress', progress), Review = model('Review', review), Activity = model('Activity', activity), Revision = model('Revision', revision), DomainEvent = model('DomainEvent', event);
-export const allModels = [User, Session, Folder, Card, Media, Progress, Review, Activity, Revision, DomainEvent];
+// Persisted Yjs CRDT state for live co-editing. The Card document remains the authoritative, versioned text.
+const cardDoc = new Schema({ card: { ...ref('Card'), unique: true }, state: { type: Buffer, required: true, select: false } }, options);
+export const User = model('User', user), Session = model('Session', session), Folder = model('Folder', folder), Card = model('Card', card), Media = model('Media', media), Progress = model('Progress', progress), Review = model('Review', review), Activity = model('Activity', activity), Revision = model('Revision', revision), DomainEvent = model('DomainEvent', event), CardDoc = model('CardDoc', cardDoc);
+export const allModels = [User, Session, Folder, Card, Media, Progress, Review, Activity, Revision, DomainEvent, CardDoc];

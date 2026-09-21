@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Folder, Activity, DomainEvent } from '../models/index.js';
 import { assert } from '../utils/errors.js';
+import { beginCollecting, queueEvent, flushEvents } from '../realtime/bus.js';
 export function roleOf(folder, user) {
   if (!user) return folder.visibility === 'global' ? 'viewer' : null;
   if (String(folder.owner._id ?? folder.owner) === String(user._id ?? user)) return 'owner';
@@ -17,15 +18,20 @@ export async function accessFolder(id, user, level = 'viewer', session) {
   return folder;
 }
 export async function mutateFolder(id, user, level, operation) {
-  return mongoose.connection.transaction(async session => {
+  let current;
+  const result = await mongoose.connection.transaction(async session => {
+    current = session; beginCollecting(session); // reset per attempt so a retried transaction never double-publishes
     const folder = await accessFolder(id, user, level, session);
     // All folder-scoped writes touch the ACL document in the same transaction.
     // Revocations and concurrent edits therefore serialize with authorized writes.
     await Folder.updateOne({ _id: folder._id }, { $inc: { writeEpoch: 1 } }, { session });
     return operation(folder, session);
   });
+  if (current) flushEvents(current); // committed: now tell live subscribers
+  return result;
 }
-export async function recordEvent(folder, actor, action, detail, session, aggregateId = folder.id) {
+export async function recordEvent(folder, actor, action, detail, session, aggregateId = folder.id, extra = {}) {
   await Activity.create([{ folder: folder.id, actor: actor.id, action, detail }], { session });
   await DomainEvent.create([{ type: action, aggregateId, payload: { folderId: folder.id } }], { session });
+  queueEvent(session, { type: action, folderId: String(folder.id), aggregateId: String(aggregateId), detail, actor: { id: String(actor.id), name: actor.name, username: actor.username }, at: new Date().toISOString(), ...extra });
 }

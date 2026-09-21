@@ -26,7 +26,7 @@ export async function updateCard(id, user, body) {
     await verifyImages(body, folder, session);
     await Revision.create([{ card: card.id, folder: folder.id, editor: user.id, version: card.version, snapshot: { front: card.front, back: card.back, tags: card.tags, hint: card.hint, source: card.source } }], { session });
     const { version, ...data } = body; Object.assign(card, data); card.version++; card.updatedBy = user.id; await card.save({ session });
-    await recordEvent(folder, user, 'card.updated', card.front.text.slice(0, 100) || 'Image card', session, card.id); return card;
+    await recordEvent(folder, user, 'card.updated', card.front.text.slice(0, 100) || 'Image card', session, card.id, { version: card.version }); return card;
   });
 }
 export async function deleteCard(id, user) {

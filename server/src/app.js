@@ -8,10 +8,12 @@ import { fileURLToPath } from 'node:url';
 import routes from './routes/index.js';
 import healthRoutes from './routes/health.js';
 import { optionalAuth } from './middleware/auth.js';
+export const trustedOrigins = () => (process.env.CLIENT_ORIGIN || 'http://localhost:4173').split(',').map(v => v.trim()).filter(Boolean);
 export function createApp() {
   const app = express(); app.disable('x-powered-by'); if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
-  const origins = (process.env.CLIENT_ORIGIN || 'http://localhost:4173').split(',').map(v => v.trim());
-  app.use(helmet({ contentSecurityPolicy: { directives: { "img-src": ["'self'", 'blob:', 'data:'], "script-src": ["'self'"], "style-src": ["'self'", "'unsafe-inline'"], "connect-src": ["'self'", ...origins] } } }));
+  const origins = trustedOrigins();
+  // connect-src includes ws(s) so the same-origin Socket.IO connection is allowed by CSP in every browser.
+  app.use(helmet({ contentSecurityPolicy: { directives: { "img-src": ["'self'", 'blob:', 'data:'], "script-src": ["'self'"], "style-src": ["'self'", "'unsafe-inline'"], "connect-src": ["'self'", 'ws:', 'wss:', ...origins] } } }));
   app.use(cors({ origin: origins, credentials: true }));
   app.use('/api', rateLimit({ windowMs: 60000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false }));
   // CSRF guard for writes. Same-origin requests (Origin host === Host header) are always allowed, so the standard

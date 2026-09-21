@@ -1,8 +1,10 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import { connectDatabase } from './config/database.js';
-import { createApp } from './app.js';
+import { createApp, trustedOrigins } from './app.js';
 import { allModels } from './models/index.js';
+import { attachRealtime } from './realtime/index.js';
 await connectDatabase(); await Promise.all(allModels.map(m => m.init()));
 const server = createApp().listen(process.env.PORT || 4000, '0.0.0.0', () => console.log('Recall API is ready.'));
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(async () => { await mongoose.disconnect(); process.exit(0); }));
+const io = attachRealtime(server, trustedOrigins());
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { io.close(); server.close(async () => { await mongoose.disconnect(); process.exit(0); }); });
