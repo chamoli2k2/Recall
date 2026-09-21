@@ -22,7 +22,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | PATCH | `/folders/:id/save` | Reader; saved boolean |
 | GET | `/folders/:id/activity` | Member-only activity details |
 | GET | `/folders/:id/cards` | Reader; includes only caller’s progress (FSRS `stability`, `difficulty`, `state`, `retrievability`, and a `preview` of the interval for each rating) |
-| POST | `/folders/:id/cards` | Editor/owner |
+| POST | `/folders/:id/cards` | Editor/owner. `front.text`/`back.text` are Markdown source and may contain `$…$`/`$$…$$` LaTeX and Anki-style cloze markers `{{c1::answer::hint}}`; when the front has a cloze, the back may be empty |
 | POST | `/folders/:id/images` | Editor/owner; multipart field `image` |
 | POST | `/folders/:id/import` | Editor/owner; multipart `file` (.apkg, Anki .txt, .csv/.tsv, .md, .json ≤ 25 MB) and optional `tags`. `?dryRun=1` returns `{ format, total, skipped, sample }` without writing; otherwise inserts up to 2000 cards in one transaction and returns `{ imported, skipped }` |
 | GET | `/folders/:id/export` | Reader; JSON download of the folder's cards, or `?format=csv` |

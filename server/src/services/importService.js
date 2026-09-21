@@ -1,12 +1,14 @@
 import { unzipSync, strFromU8 } from 'fflate';
 import { createRequire } from 'node:module';
+import { hasCloze } from '../../../shared/cloze.js';
 // Parsers for bringing cards in from other tools. Every parser is a pure function that returns normalised
 // { front, back, tags, hint, source } objects; validation against the card schema happens in the service.
 export const MAX_CARDS = 2000, MAX_TEXT = 10000;
 const clean = s => String(s ?? '').replace(/\r\n?/g, '\n').trim().slice(0, MAX_TEXT);
 const normaliseTags = tags => [...new Set((Array.isArray(tags) ? tags : String(tags || '').split(/[\s,;]+/)).map(t => String(t).trim().toLowerCase().replace(/^#/, '').slice(0, 30)).filter(Boolean))].slice(0, 10);
 export const makeCard = ({ front, back, tags = [], hint = '', source = '' }) => ({ front: { text: clean(front), image: null }, back: { text: clean(back), image: null }, tags: normaliseTags(tags), hint: clean(hint).slice(0, 1000), source: /^https?:\/\/\S+$/.test(String(source || '').trim()) ? String(source).trim() : '' });
-const usable = c => c.front.text && c.back.text;
+// Anki cloze notes arrive with the whole sentence in the first field and an empty (or "extra") second field.
+const usable = c => c.front.text && (c.back.text || hasCloze(c.front.text));
 /** Anki fields are HTML. Keep line breaks and cloze markers, drop tags, media references and entities. */
 export function stripHtml(html) {
   return String(html ?? '').replace(/\[sound:[^\]]*\]/g, '').replace(/<br\s*\/?>|<\/(?:p|div|li|h\d|tr)>/gi, '\n').replace(/<li[^>]*>/gi, '• ').replace(/<img[^>]*>/gi, '').replace(/<[^>]+>/g, '')

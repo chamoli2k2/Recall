@@ -4,6 +4,7 @@ import { assert } from '../utils/errors.js';
 import { previewSchedule } from './studyService.js';
 import { currentRetrievability, DEFAULT_RETENTION } from './fsrs.js';
 import { MAX_CARDS } from './importService.js';
+import { stripCloze } from '../../../shared/cloze.js';
 export async function listCards(folderId, user) {
   await accessFolder(folderId, user);
   const cards = await Card.find({ folder: folderId }).sort({ createdAt: 1 });
@@ -22,7 +23,7 @@ export async function createCard(folderId, user, body) {
   return mutateFolder(folderId, user, 'editor', async (folder, session) => {
     assert(!folder.archived, 409, 'Restore this folder before adding cards.'); await verifyImages(body, folder, session);
     const [card] = await Card.create([{ ...body, folder: folder.id, createdBy: user.id, updatedBy: user.id }], { session });
-    await recordEvent(folder, user, 'card.created', body.front.text.slice(0, 100) || 'Image card', session, card.id); return card;
+    await recordEvent(folder, user, 'card.created', stripCloze(body.front.text).slice(0, 100) || 'Image card', session, card.id); return card;
   });
 }
 /** Bulk insert already-parsed cards in one transaction; one activity event summarises the import. */
@@ -47,13 +48,13 @@ export async function updateCard(id, user, body) {
     await verifyImages(body, folder, session);
     await Revision.create([{ card: card.id, folder: folder.id, editor: user.id, version: card.version, snapshot: { front: card.front, back: card.back, tags: card.tags, hint: card.hint, source: card.source } }], { session });
     const { version, ...data } = body; Object.assign(card, data); card.version++; card.updatedBy = user.id; await card.save({ session });
-    await recordEvent(folder, user, 'card.updated', card.front.text.slice(0, 100) || 'Image card', session, card.id, { version: card.version }); return card;
+    await recordEvent(folder, user, 'card.updated', stripCloze(card.front.text).slice(0, 100) || 'Image card', session, card.id, { version: card.version }); return card;
   });
 }
 export async function deleteCard(id, user) {
   const current = await Card.findById(id); assert(current, 404, 'Card not found.');
   return mutateFolder(current.folder, user, 'editor', async (folder, session) => {
     await Card.deleteOne({ _id: id }, { session }); await Revision.deleteMany({ card: id }, { session }); await Progress.deleteMany({ card: id }, { session });
-    await recordEvent(folder, user, 'card.deleted', current.front.text.slice(0, 100), session, id);
+    await recordEvent(folder, user, 'card.deleted', stripCloze(current.front.text).slice(0, 100), session, id);
   });
 }

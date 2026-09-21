@@ -23,6 +23,9 @@ test('card validation rejects empty sides and unsafe sources; usernames normaliz
   assert.throws(() => cardSchema.parse({ front: { text: '' }, back: { text: 'answer' } }));
   assert.throws(() => cardSchema.parse({ front: { text: 'question' }, back: { text: 'answer' }, source: 'javascript:alert(1)' }));
   const card = cardSchema.parse({ front: { text: 'Q' }, back: { text: 'A' }, tags: [' React ', 'react'] }); assert.deepEqual(card.tags, ['react']);
+  // A cloze deletion on the front is its own answer, so the back may be empty; a plain front still needs one.
+  assert.throws(() => cardSchema.parse({ front: { text: 'Paris is the capital of France' }, back: { text: '' } }));
+  assert.equal(cardSchema.parse({ front: { text: '{{c1::Paris}} is the capital of {{c2::France::country}}' }, back: { text: '' } }).back.text, '');
 });
 test('API health, anonymous writes, untrusted origins and input validation', async () => {
   const app = createApp();

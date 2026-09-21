@@ -25,6 +25,8 @@ test('Anki plain-text export: metadata header, HTML fields, guid/notetype/deck c
   const cards = parseAnkiText(text); assert.equal(cards.length, 1);
   assert.equal(cards[0].front.text, 'What is DNS?'); assert.equal(cards[0].back.text, 'Name &rarr; address\nlookup'); assert.deepEqual(cards[0].tags, ['networking', 'dns']);
   assert.equal(stripHtml('<div>a</div><div>b</div><ul><li>c</li></ul>'), 'a\nb\n• c');
+  // Cloze notes have an empty back field but are still importable.
+  const cloze = parseAnkiText('#separator:tab\n#html:true\nThe {{c1::heart}} pumps <b>blood</b>.\t\n'); assert.equal(cloze.length, 1); assert.equal(cloze[0].front.text, 'The {{c1::heart}} pumps blood.'); assert.equal(cloze[0].back.text, '');
 });
 test('Anki .apkg: SQLite collection inside a zip; fields split on 0x1f; newest zstd format gets a clear message', async () => {
   const SQL = await import('sql.js').then(m => m.default({ locateFile: f => new URL(`../../node_modules/sql.js/dist/${f}`, import.meta.url).pathname }));

@@ -1,5 +1,6 @@
 import { Folder, Card, Progress, Review } from '../models/index.js';
 import { currentRetrievability, DEFAULT_RETENTION } from './fsrs.js';
+import { stripCloze } from '../../../shared/cloze.js';
 const DAY = 86400000;
 const startOfUtcDay = d => { const s = new Date(d); s.setUTCHours(0, 0, 0, 0); return s; };
 /** Folders the user can study: own, shared with them, or saved public collections. */
@@ -36,7 +37,7 @@ export async function studyStats(user, now = new Date()) {
   for (const p of progress) states[p.state === 'new' && p.reps ? 'learning' : (p.state in states ? p.state : 'review')]++;
   const byCard = new Map(cards.map(c => [String(c._id), c]));
   const hardest = progress.filter(p => p.difficulty > 0).sort((a, b) => b.difficulty - a.difficulty || b.lapses - a.lapses).slice(0, 5)
-    .map(p => ({ cardId: String(p.card), folderId: String(byCard.get(String(p.card))?.folder), text: (byCard.get(String(p.card))?.front.text || 'Image card').slice(0, 90), difficulty: Math.round(p.difficulty * 10) / 10, lapses: p.lapses, stability: Math.round(p.stability * 10) / 10 }));
+    .map(p => ({ cardId: String(p.card), folderId: String(byCard.get(String(p.card))?.folder), text: (stripCloze(byCard.get(String(p.card))?.front.text) || 'Image card').slice(0, 90), difficulty: Math.round(p.difficulty * 10) / 10, lapses: p.lapses, stability: Math.round(p.stability * 10) / 10 }));
   const avgStability = progress.length ? progress.reduce((a, p) => a + (p.stability || p.interval || 0), 0) / progress.length : 0;
   return {
     totalCards: cards.length, due, reviewed, reviewsToday, mastered: progress.filter(p => (p.stability || p.interval) >= 21).length, goal: user.dailyGoal,
