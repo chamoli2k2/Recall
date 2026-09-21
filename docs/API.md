@@ -8,7 +8,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | POST | `/auth/login` | identifier (username/email), password |
 | POST | `/auth/logout` | End current session |
 | GET | `/auth/me` | Current user, or null |
-| PATCH | `/auth/profile` | Own name, bio, dailyGoal |
+| PATCH | `/auth/profile` | Own name, bio, dailyGoal, desiredRetention (0.7–0.97) |
 | GET | `/users/:username` | Public profile and global folders only |
 | GET | `/folders` | Own/shared/saved accessible collections |
 | GET | `/folders?scope=explore` | Public discovery |
@@ -21,7 +21,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | PATCH | `/folders/:id/archive` | Owner; archived boolean |
 | PATCH | `/folders/:id/save` | Reader; saved boolean |
 | GET | `/folders/:id/activity` | Member-only activity details |
-| GET | `/folders/:id/cards` | Reader; includes only caller’s progress |
+| GET | `/folders/:id/cards` | Reader; includes only caller’s progress (FSRS `stability`, `difficulty`, `state`, `retrievability`, and a `preview` of the interval for each rating) |
 | POST | `/folders/:id/cards` | Editor/owner |
 | POST | `/folders/:id/images` | Editor/owner; multipart field `image` |
 | GET | `/media/:id` | Reader permission on the parent folder |
@@ -30,7 +30,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | GET | `/cards/:id/revisions` | Editor/owner |
 | PATCH | `/cards/:id/bookmark` | Reader; own bookmarked boolean |
 | POST | `/reviews` | Reader; cardId, rating, requestId UUID, progress version |
-| GET | `/stats` | Own study statistics |
+| GET | `/stats` | Own study statistics: totals, `retention { desired, predicted, observed, sampled, averageStability }`, 14-day `forecast`, memory `states`, `hardest` cards |
 | GET | `/health` | Liveness: Express is running. Public, no database access, always 200 |
 | GET | `/ready` | Readiness: MongoDB answers a ping within `READINESS_TIMEOUT_MS`. 200 ready / 503 unavailable; no error details |
 

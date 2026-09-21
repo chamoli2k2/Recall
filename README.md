@@ -12,7 +12,8 @@ A collaborative flashcard application built with **React, Express, and MongoDB**
 - Version conflict detection, change history, and restoration into a new draft still protect every save; polling every 15 seconds remains as a fallback when the socket is disconnected.
 - Global discovery, public profiles, anonymous public-card viewing, saved collections, and private copies.
 - A public home page at `/` for signed-out visitors: interactive sample card, how-it-works, live public collections, and clear sign-in/sign-up paths (`/login`, `/signup`). Anonymous visitors can read and flip public cards but cannot create, edit, save, or copy — the API enforces this, not just the UI.
-- Quick review, due-card study, review scheduling, daily goals, personal progress, and keyboard shortcuts.
+- FSRS spaced repetition (the algorithm behind modern Anki) with a per-learner desired-retention setting, interval previews on the rating buttons, and retention analytics: predicted vs observed recall, a 14-day due forecast, memory-state distribution, and your hardest cards. See [Spaced repetition](#spaced-repetition-fsrs).
+- Quick review, due-card study, daily goals, personal progress, and keyboard shortcuts.
 - Archive and restore folders; confirmed permanent deletion of individual cards.
 - Permission-checked image delivery. Images are decoded, resized, stripped of metadata, and stored in MongoDB.
 - Light and dark themes. The toggle in the top bar (and on the sign-in and public pages) saves the choice in `localStorage`; with no saved choice the app follows the OS preference. `public/theme.js` applies the theme before first paint, as a file rather than inline because the CSP forbids inline scripts.
@@ -194,9 +195,17 @@ What version conflicts mean now: text no longer conflicts (the CRDT merges it), 
 
 Sockets are observe-only. No mutation is accepted over the WebSocket — every write is an authorised, transactional HTTP request, which keeps one code path for authorisation, validation, idempotency, and auditing. `scripts/collab-peer.js` simulates a second collaborator from the terminal for demos.
 
-### Spaced repetition
+### Spaced repetition (FSRS)
 
-`schedule(previous, rating)` is an SM-2-style interval algorithm: `again` resets repetitions and re-queues in 10 minutes; `hard` grows the interval by 1.2× (min 1 day) and lowers ease; `good` follows 1 → 3 → interval × ease; `easy` grows by ease × 1.3 (min 4 days) and raises ease. Ease is floored at 1.3. It is a pure function with unit tests, so it can be swapped for FSRS later without touching the transaction code. Daily goals use UTC boundaries.
+Scheduling uses **FSRS** (Free Spaced Repetition Scheduler, the algorithm behind modern Anki), implemented from the published FSRS-5 formulas as pure functions in `server/src/services/fsrs.js`. Each card carries a per-learner memory state:
+
+- **Stability (S)** — days until the probability of recall drops to 90%.
+- **Difficulty (D)** — 1 (easy) to 10 (hard), updated with linear damping and mean reversion so it cannot run away.
+- **Retrievability (R)** — predicted probability of recalling right now, `R = (1 + 19/81 · t/S)^-0.5`.
+
+A rating updates S and D (different formulas for successful recall, for forgetting, and for same-day reviews), and the next interval is the time at which R would fall to the learner's **desired retention** (default 90%, adjustable 70–97% in Settings): `I = S/(19/81) · (r^-2 − 1)`. `again` re-queues in 10 minutes and counts as a lapse. Existing SM-2 progress is converted (`interval → S`, `ease → D`) so nobody loses their history. The study buttons show the interval each rating would produce, and the card shows its current predicted recall.
+
+Why FSRS over SM-2: it models memory explicitly instead of multiplying intervals by an ease factor, adapts to how overdue a review was, and exposes retention as a tunable trade-off between workload and forgetting. The Progress page reports **predicted retention** (mean R across cards), **observed retention** (share of non-first reviews not rated *again*, the standard way FSRS is evaluated), a 14-day due forecast, the memory-state distribution (new / learning / review / relearning), and the hardest cards. Daily goals use UTC boundaries.
 
 ### Security controls
 

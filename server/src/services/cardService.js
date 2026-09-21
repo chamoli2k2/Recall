@@ -1,12 +1,18 @@
 import { Card, Media, Progress, Revision } from '../models/index.js';
 import { accessFolder, mutateFolder, recordEvent } from './accessService.js';
 import { assert } from '../utils/errors.js';
+import { previewSchedule } from './studyService.js';
+import { currentRetrievability, DEFAULT_RETENTION } from './fsrs.js';
 export async function listCards(folderId, user) {
   await accessFolder(folderId, user);
   const cards = await Card.find({ folder: folderId }).sort({ createdAt: 1 });
   const progress = user ? await Progress.find({ user: user.id, card: { $in: cards.map(c => c.id) } }) : [];
-  const map = new Map(progress.map(p => [String(p.card), p.toJSON()]));
-  return cards.map(c => ({ ...c.toJSON(), progress: map.get(c.id) ?? { version: 0, repetitions: 0, interval: 0, bookmarked: false, dueAt: null } }));
+  const now = new Date(), retention = user?.desiredRetention || DEFAULT_RETENTION;
+  // Each card carries the caller's memory state, current recall probability and the interval every rating would produce.
+  const present = p => ({ ...p.toJSON(), retrievability: currentRetrievability(p, now), preview: previewSchedule(p.toObject(), retention, now) });
+  const map = new Map(progress.map(p => [String(p.card), present(p)]));
+  const fresh = user ? { version: 0, repetitions: 0, interval: 0, bookmarked: false, dueAt: null, state: 'new', retrievability: null, preview: previewSchedule({}, retention, now) } : { version: 0, repetitions: 0, interval: 0, bookmarked: false, dueAt: null, state: 'new' };
+  return cards.map(c => ({ ...c.toJSON(), progress: map.get(c.id) ?? fresh }));
 }
 async function verifyImages(body, folder, session) {
   for (const side of ['front', 'back']) if (body[side]?.image) assert(await Media.exists({ _id: body[side].image, folder: folder.id }).session(session), 400, 'Image does not belong to this folder.');

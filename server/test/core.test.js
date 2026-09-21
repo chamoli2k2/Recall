@@ -5,13 +5,13 @@ import { schedule } from '../src/services/studyService.js';
 import { roleOf } from '../src/services/accessService.js';
 import { cardSchema, usernameSchema } from '../src/middleware/validate.js';
 import { createApp } from '../src/app.js';
-test('a forgotten card returns after ten minutes; hard cannot reduce the interval below one day', () => {
+test('a forgotten card returns after ten minutes; intervals never drop below one day and grow with repeated success', () => {
   const now = new Date('2026-01-01T00:00:00Z');
-  const again = schedule({ interval: 30, repetitions: 5, ease: 1.3 }, 'again', now);
-  assert.equal(again.dueAt.toISOString(), '2026-01-01T00:10:00.000Z'); assert.equal(again.repetitions, 0); assert.equal(again.ease, 1.3);
-  assert.equal(schedule({ interval: 0, repetitions: 0 }, 'hard', now).interval, 1);
-  assert.equal(schedule({ interval: 0, repetitions: 0 }, 'good', now).interval, 1);
-  assert.equal(schedule({ interval: 1, repetitions: 1 }, 'good', now).interval, 3);
+  const again = schedule({ interval: 30, repetitions: 5, ease: 1.3, lastReviewedAt: new Date('2025-12-02T00:00:00Z') }, 'again', now);
+  assert.equal(again.dueAt.toISOString(), '2026-01-01T00:10:00.000Z'); assert.equal(again.repetitions, 0); assert.equal(again.interval, 0);
+  assert.ok(schedule({ interval: 0, repetitions: 0 }, 'hard', now).interval >= 1);
+  const first = schedule({ interval: 0, repetitions: 0 }, 'good', now); assert.ok(first.interval >= 1);
+  const second = schedule(first, 'good', new Date(now.getTime() + first.interval * 86400000)); assert.ok(second.interval > first.interval);
 });
 test('private/public visibility and explicit roles do not grant editor access to strangers', () => {
   const folder = { owner: 'owner', visibility: 'private', members: [{ user: 'editor', role: 'editor' }, { user: 'reader', role: 'viewer' }] };

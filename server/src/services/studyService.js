@@ -1,12 +1,10 @@
 import { Card, Progress, Review } from '../models/index.js';
 import { mutateFolder } from './accessService.js';
 import { assert } from '../utils/errors.js';
-export function schedule(previous, rating, now = new Date()) {
-  let { interval = 0, repetitions = 0, ease = 2.5 } = previous;
-  if (rating === 'again') { repetitions = 0; interval = 0; ease = Math.max(1.3, ease - .2); }
-  else { interval = rating === 'hard' ? Math.max(1, Math.round(interval * 1.2)) : rating === 'easy' ? Math.max(4, Math.round(interval * ease * 1.3)) : repetitions === 0 ? 1 : repetitions === 1 ? 3 : Math.max(1, Math.round(interval * ease)); repetitions++; if (rating === 'easy') ease += .15; if (rating === 'hard') ease = Math.max(1.3, ease - .15); }
-  return { interval, repetitions, ease, lastReviewedAt: now, dueAt: new Date(now.getTime() + (rating === 'again' ? 600000 : interval * 86400000)) };
-}
+import { schedule as fsrsSchedule, preview, DEFAULT_RETENTION } from './fsrs.js';
+// Scheduling is FSRS (see fsrs.js). This wrapper keeps the original signature so callers and tests stay unchanged.
+export const schedule = (previous, rating, now = new Date(), options) => fsrsSchedule(previous, rating, now, options);
+export const previewSchedule = (previous, retention = DEFAULT_RETENTION, now = new Date()) => preview(previous, now, { retention });
 export async function reviewCard(user, body) {
   const card = await Card.findById(body.cardId); assert(card, 404, 'Card not found.');
   return mutateFolder(card.folder, user, 'viewer', async (_folder, session) => {
@@ -15,8 +13,9 @@ export async function reviewCard(user, body) {
     let progress = await Progress.findOne({ user: user.id, card: card.id }).session(session);
     assert((progress?.version ?? 0) === body.version, 409, 'This card was reviewed on another device. Refresh the session.', 'VERSION_CONFLICT');
     if (!progress) progress = new Progress({ user: user.id, card: card.id });
-    Object.assign(progress, schedule(progress, body.rating)); progress.version++;
-    await progress.save({ session }); const result = progress.toJSON();
-    await Review.create([{ user: user.id, card: card.id, requestId: body.requestId, rating: body.rating, result }], { session }); return result;
+    const now = new Date(); const before = progress.toObject();
+    Object.assign(progress, schedule(before, body.rating, now, { retention: user.desiredRetention || DEFAULT_RETENTION })); progress.version++;
+    await progress.save({ session }); const result = { ...progress.toJSON(), preview: previewSchedule(progress.toObject(), user.desiredRetention || DEFAULT_RETENTION, now) };
+    await Review.create([{ user: user.id, card: card.id, requestId: body.requestId, rating: body.rating, result, elapsedDays: result.elapsedDays, folder: card.folder }], { session }); return result;
   });
 }

@@ -15,7 +15,7 @@ r.post('/auth/signup', authLimit, validate(signupSchema), a(auth.signup));
 r.post('/auth/login', authLimit, validate(z.object({ identifier: z.string().min(1).max(254), password: z.string().min(1).max(128) })), a(auth.login));
 r.post('/auth/logout', a(auth.logout)); r.get('/auth/me', a(auth.me));
 r.get('/users/:username', a(auth.publicProfile));
-r.patch('/auth/profile', requireAuth, validate(z.object({ name: z.string().trim().min(1).max(60), bio: z.string().max(300), dailyGoal: z.number().int().min(1).max(200) })), a(auth.profile));
+r.patch('/auth/profile', requireAuth, validate(z.object({ name: z.string().trim().min(1).max(60), bio: z.string().max(300), dailyGoal: z.number().int().min(1).max(200), desiredRetention: z.number().min(0.7).max(0.97).optional() })), a(auth.profile));
 r.get('/folders', (req, res, next) => req.query.scope === 'explore' ? next() : requireAuth(req, res, next), a(folders.list));
 r.get('/folders/archived', requireAuth, a(folders.archived));
 r.post('/folders', requireAuth, validate(folderSchema), a(folders.create));
