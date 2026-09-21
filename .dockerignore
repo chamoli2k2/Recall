@@ -5,3 +5,8 @@ dist
 .local-data
 .sites-runtime
 *.log
+e2e
+playwright.config.js
+test-results
+playwright-report
+.github

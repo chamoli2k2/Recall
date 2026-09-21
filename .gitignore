@@ -5,5 +5,7 @@ dist/
 .sites-runtime/
 .local-data/
 coverage/
+test-results/
+playwright-report/
 *.log
 .DS_Store

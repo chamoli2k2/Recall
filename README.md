@@ -16,6 +16,7 @@ A collaborative flashcard application built with **React, Express, and MongoDB**
 - Import from Anki (`.apkg` via SQLite-in-WASM and zip parsing, or the plain-text export), CSV/TSV (header or positional columns, RFC 4180 quoting), Markdown (`Q:`/`A:` blocks, headings, `term :: definition`, tables) and Recall JSON; two-step dry-run preview, then a single-transaction bulk insert of up to 2,000 cards. Export any folder as JSON or CSV.
 - Rich cards: GitHub-flavoured Markdown, LaTeX math via KaTeX (`$…$` inline, `$$…$$` block), and Anki-compatible cloze deletions (`{{c1::answer}}` or `{{c1::answer::hint}}`). A cloze card needs no back: the front is shown with blanks and flipped to reveal the answers. The editor has a formatting toolbar (⌘B / ⌘I / ⌘⇧C), a live preview that follows collaborators' edits, and everything renders through DOMPurify. See [Rich text and cloze](#rich-text-markdown-latex-cloze).
 - Live quiz rooms: turn any folder into a Kahoot-style multiplayer game. The host gets a six-letter code, players join from `/rooms`, questions are multiple choice (the card's answer among distractors drawn from the same folder), faster correct answers score more, streaks add a bonus, and the round reveals early once everyone has answered. Ephemeral, in-memory, and fully server-authoritative over Socket.IO. See [Live quiz rooms](#live-quiz-rooms).
+- Three layers of automated tests, all run by GitHub Actions on every push and pull request: Node unit tests for the pure logic (FSRS, cloze, import parsers, event bus, CRDT store, quiz rooms), integration tests against a real MongoDB replica set with real Socket.IO clients, and Playwright browser tests that sign up users, author and study cards, co-edit in two browsers, and play a whole quiz. See [TESTING.md](TESTING.md).
 - Study habit dashboard: a GitHub-style activity heatmap (26 weeks, shaded by reviews per UTC day), current and longest streaks, study-day count, a 30-day rating mix, and generated insights such as the hour of day you remember best and your busiest weekday. Computed with MongoDB aggregation pipelines over the review log.
 - Quick review, due-card study, daily goals, personal progress, and keyboard shortcuts.
 - Archive and restore folders; confirmed permanent deletion of individual cards.
@@ -249,6 +250,16 @@ The `DomainEvent` collection is a **transactional outbox**: every write appends 
 - Graceful shutdown on `SIGINT`/`SIGTERM`: stop accepting, drain, disconnect Mongoose.
 - Rate limiting is per process; multiple replicas need a shared store — documented in *Scope and limits*.
 
+### Testing strategy and CI
+
+Tests are split by what they need to run, so the fast ones stay fast:
+
+- **Unit** (`npm test`, seconds, no database): pure modules — FSRS formulas, cloze parsing, import parsers, the post-commit event bus, the CRDT document store, the quiz `RoomStore` (with an injected clock and scheduler), health endpoints against a disconnected Mongoose.
+- **Integration** (`npm run test:integration`): a real MongoDB **replica set** from `mongodb-memory-server` so transactions actually run, `supertest` agents for cookie sessions, and real `socket.io-client` connections. This is where concurrency claims are proven: two concurrent updates yield one 200 and one 409, duplicate review requests return the same result, a rejected write broadcasts nothing, revocation ejects live sockets.
+- **End-to-end** (`npm run test:e2e`): Playwright drives Chromium against the production build served by the API on a throwaway database. Multi-user flows use two isolated browser contexts (two cookie jars) — co-editing with visible remote cursors and a full quiz round are tested this way.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs all three plus a Docker build on every push and PR, caching the mongod binary and uploading Playwright traces when something fails.
+
 ### Trade-offs and what changes at scale
 
 | Decision | Why now | Next step when it hurts |
@@ -354,7 +365,8 @@ Before enabling RAG, enforce folder access again during retrieval, process priva
 
 ```bash
 npm test                  # Core checks; database integration cases reported as skipped
-npm run test:integration  # Real MongoDB replica-set integration tests
+npm run test:integration  # Real MongoDB replica-set integration tests (HTTP + Socket.IO)
+npm run test:e2e          # Playwright browser tests against a built client and a throwaway database
 npm run build             # Real API-backed React build
 npm run build:preview     # Explicit in-memory UI preview build
 npm run healthcheck       # One external liveness ping of HEALTHCHECK_URL; exit 0/1/2

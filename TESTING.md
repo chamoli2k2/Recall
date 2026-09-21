@@ -21,3 +21,15 @@ Verified passing on macOS with `mongodb-memory-server` 7.0.
 ## Browser verification
 
 Two users on one folder (one in the browser, one simulated with `node scripts/collab-peer.js <folderId> <username> <password> --type "text"`): the presence stack shows the other user with their colour, the card shows an "editing" badge with their name, the card editor switches to live mode ("Live · 1 other editing"), the other user's typing and coloured cursor appear character by character, saving writes the merged text (both users' edits) into the card, and a card created by the other user appears with a toast without a refresh.
+
+## `npm run test:e2e` (Playwright, real browser)
+
+`playwright.config.js` starts `scripts/e2e-server.js`, which boots a throwaway in-memory MongoDB replica set and the API serving the built client on port 4100 (run `npm run build` first; `npx playwright install chromium` once). Each test signs up fresh accounts through the API and drives the UI in Chromium; multi-user tests use separate browser contexts.
+
+- `e2e/learning.spec.js`: sign-up through the form; a Markdown + LaTeX + cloze card authored in the editor (preview shows blanks and KaTeX output), rendered in the folder grid, flipped to reveal the answer, then studied with FSRS interval previews on the rating buttons; CSV import with dry-run preview and JSON/CSV export; the Progress page's retention panel, heatmap and streak after a review.
+- `e2e/collaboration.spec.js`: two browsers on one folder see each other's presence, a card created by one appears on the other with a toast, both open the same card and type concurrently through the CRDT editor (text converges, the remote cursor shows the peer's name), the merged text saves through the versioned API; revoking access ejects the collaborator to the library with a message.
+- `e2e/quiz.spec.js`: host sets up a quiz from the folder menu, a friend joins by code, both lobbies list both players, only the host can start, an answer locks in, the round reveals early when everyone has answered with correct/wrong highlighting and a leaderboard, an unanswered round times out on the server, and the podium ranks the winner. Signed-out invite links redirect through login and back to the room.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request: unit tests, API + realtime integration tests, the Playwright suite (with the HTML report and traces uploaded on failure), and a Docker image build. The mongod binary used by `mongodb-memory-server` is cached between runs.
