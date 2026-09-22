@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Plus, ArrowLeft, FolderPlus, Trash2, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { reportError } from '../services/errors';
 import { useApp, useLoad } from '../hooks/useApp';
 import { Button, Loading, ErrorState, Empty, Modal, Field } from '../components/ui';
 import FolderTile from '../components/FolderTile';
@@ -45,8 +46,8 @@ export function ProjectPage() {
   const { data: lib } = useLoad(() => api('/folders'), [revision]);
   const [add, setAdd] = useState(false), [edit, setEdit] = useState(false);
   const project = data?.project;
-  async function addFolder(folderId) { try { await api(`/projects/${id}/folders`, { method: 'POST', body: { folderId } }); refresh(); setAdd(false); toast.success('Folder added'); } catch (e) { toast.error(e.message); } }
-  async function remove(folderId) { try { await api(`/projects/${id}/folders/${folderId}`, { method: 'DELETE' }); refresh(); } catch (e) { toast.error(e.message); } }
+  async function addFolder(folderId) { try { await api(`/projects/${id}/folders`, { method: 'POST', body: { folderId } }); refresh(); setAdd(false); toast.success('Folder added'); } catch (e) { reportError(e); } }
+  async function remove(folderId) { try { await api(`/projects/${id}/folders/${folderId}`, { method: 'DELETE' }); refresh(); } catch (e) { reportError(e); } }
   if (loading) return <Loading/>; if (error || !project) return <ErrorState message={error || 'Project not found.'}/>;
   const have = new Set((project.folders || []).map(f => f.id));
   const available = (lib?.folders || []).filter(f => !have.has(f.id));

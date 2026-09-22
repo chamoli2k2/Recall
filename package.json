@@ -9,10 +9,10 @@
     "dev:local": "node scripts/local.js",
     "build": "VITE_DEMO_MODE=false vite build",
     "start": "node server/src/index.js",
-    "test": "node --test --test-concurrency=1 server/test/*.test.js",
+    "test": "LOG_LEVEL=silent node --test --test-concurrency=1 server/test/*.test.js",
     "seed": "node server/src/seed.js",
     "healthcheck": "node scripts/healthcheck.js",
-    "test:integration": "RUN_INTEGRATION=1 node --test --test-concurrency=1 server/test/integration.test.js server/test/realtime.integration.test.js",
+    "test:integration": "RUN_INTEGRATION=1 LOG_LEVEL=silent node --test --test-concurrency=1 server/test/integration.test.js server/test/realtime.integration.test.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "build:preview": "VITE_DEMO_MODE=true vite build"

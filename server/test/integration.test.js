@@ -134,6 +134,35 @@ integration('dashboard is staff-only; premium routes reject a normal account', a
   await User.updateOne({ username: 'outsider' }, { $set: { premiumExpiresAt: new Date(Date.now() - 86400000) } });
   assert.equal((await outsider.get('/api/projects')).status, 402);
 });
+integration('every failure comes back in one envelope with a traceable request id', async () => {
+  const missing = await outsider.get('/api/nope');
+  assert.equal(missing.status, 404);
+  assert.equal(missing.body.code, 'NO_ROUTE');
+  assert.ok(missing.body.requestId, 'the body carries an id');
+  assert.equal(missing.headers['x-request-id'], missing.body.requestId, 'and it matches the header');
+
+  const badId = await owner.get('/api/folders/not-an-object-id');
+  assert.equal(badId.status, 404);
+  assert.equal(badId.body.code, 'NOT_FOUND');
+
+  const invalid = await owner.post('/api/folders').send({ title: '' });
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.body.code, 'VALIDATION_FAILED');
+  assert.equal(invalid.body.details.field, 'title');
+
+  const duplicate = await request(app).post('/api/auth/signup').send({ username: 'owner', name: 'Clash', email: 'clash@example.test', password });
+  assert.equal(duplicate.status, 409);
+  assert.doesNotMatch(JSON.stringify(duplicate.body), /E11000|mongo/i, 'driver internals never reach the client');
+
+  const malformed = await owner.post('/api/folders').set('Content-Type', 'application/json').send('{"title":');
+  assert.equal(malformed.status, 400);
+  assert.equal(malformed.body.code, 'BAD_JSON');
+
+  const caller = await request(app).get('/api/nope').set('X-Request-Id', 'trace-me-123');
+  assert.equal(caller.body.requestId, 'trace-me-123', 'a caller-supplied id is reused for correlation');
+  const unsafe = await request(app).get('/api/nope').set('X-Request-Id', 'bad id with spaces');
+  assert.notEqual(unsafe.body.requestId, 'bad id with spaces', 'but only when it is a safe token');
+});
 integration('follows and connection requests notify the other person, and reads clear the badge', async () => {
   // Earlier tests already linked these two, so start from a clean graph.
   await Promise.all([Notification.deleteMany({}), Relationship.deleteMany({}), User.updateMany({}, { $set: { followers: 0, following: 0, friends: 0 } })]);

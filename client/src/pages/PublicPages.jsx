@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Globe2, RotateCcw, LogIn, Search } from 'lucide-react';
-import { toast } from 'sonner';
 import { api, imageUrl } from '../services/api';
+import { reportError } from '../services/errors';
 import { useApp, useLoad } from '../hooks/useApp';
 import { Avatar, FolderIcon, Loading, ErrorState, Tag, Empty, Button } from '../components/ui';
 import ThemeToggle from '../components/ThemeToggle';
@@ -34,7 +34,7 @@ export function ProfilePage() {
   const { data, loading, error } = useLoad(() => api(`/users/${username}`), [username, revision]);
   if (loading) return <Loading/>; if (error) return <ErrorState message={error}/>;
   const p = data.profile; const rel = p.relation || { following: false, friendship: user?.username === p.username ? 'self' : 'none' };
-  async function act(path, method = 'POST') { try { await api(`/users/${p.username}/${path}`, { method }); refresh(); } catch (e) { toast.error(e.message); } }
+  async function act(path, method = 'POST') { try { await api(`/users/${p.username}/${path}`, { method }); refresh(); } catch (e) { reportError(e); } }
   return <><Link to="/" className="back-link"><ArrowLeft size={16}/> Back</Link>
     <div className="profile-header public-profile"><Avatar user={p}/>
       <div><span className="eyebrow">LEARNER</span><h1>{p.name}</h1><p>@{p.username}</p>{p.bio && <p>{p.bio}</p>}

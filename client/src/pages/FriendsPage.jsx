@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { UserPlus, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { reportError } from '../services/errors';
 import { useApp, useLoad } from '../hooks/useApp';
 import { Avatar, Button, Loading, ErrorState, Empty } from '../components/ui';
 export default function FriendsPage() {
@@ -14,7 +15,7 @@ export default function FriendsPage() {
   const loading = tab === 'friends' ? lf : lr; const error = tab === 'friends' ? ef : er;
   async function act(username, path, method = 'POST') {
     try { await api(`/users/${username}/${path}`, { method }); refresh(); toast.success(path === 'connect/accept' ? 'You are now friends' : 'Request declined'); }
-    catch (e) { toast.error(e.message); }
+    catch (e) { reportError(e); }
   }
   return <>
     <div className="page-heading"><div><span className="eyebrow">YOUR PEOPLE</span><h1>Friends</h1><p>Connect with learners you know. Following stays one-way; friendship needs a yes.</p></div></div>

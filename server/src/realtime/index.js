@@ -7,7 +7,19 @@ import { PresenceStore } from './presence.js';
 import { DocStore } from './docs.js';
 import { RoomStore } from './rooms.js';
 import { notifications, presentNotification } from '../services/notificationService.js';
+import { toAppError, GENERIC } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { hasPremium } from '../../../shared/account.js';
+/**
+ * Sockets answer with `{ ok, error }` instead of HTTP statuses, so failures run through the same
+ * classifier and only exposed messages are sent back. `translate` lets a handler keep the wording
+ * the UI already expects for a given status.
+ */
+const reply = (event, ack, translate) => error => {
+  const app = toAppError(error);
+  if (app.status >= 500) logger.error(app.cause?.message || app.message, { event, stack: (app.cause || error)?.stack });
+  ack({ ok: false, error: translate?.(app) || (app.expose ? app.message : GENERIC), code: app.code });
+};
 const parseCookies = header => Object.fromEntries((header || '').split(';').map(p => p.trim().split('=')).filter(([k]) => k).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
 const same = (origin, host) => { try { return !!origin && new URL(origin).host === host; } catch { return false; } };
 export const presence = new PresenceStore();
@@ -39,7 +51,7 @@ export function attachRealtime(httpServer, origins) {
     if (socket.data.user) socket.join(`user:${socket.data.user.id}`);
     socket.on('folder:join', async (folderId, ack = () => {}) => {
       try { const folder = await accessFolder(folderId, socket.data.user); socket.join(room(folderId)); if (socket.data.user) { presence.join(folderId, socket.id, socket.data.user); broadcastPresence(folderId); } ack({ ok: true, presence: presence.list(folderId), version: folder.version }); }
-      catch (e) { ack({ ok: false, error: e.status === 404 ? 'Folder not found.' : 'No access.' }); }
+      catch (e) { reply('folder:join', ack, a => a.status === 404 ? 'Folder not found.' : 'No access.')(e); }
     });
     socket.on('folder:leave', folderId => { socket.leave(room(folderId)); presence.leave(folderId, socket.id); broadcastPresence(folderId); });
     socket.on('card:editing', (folderId, cardId) => { if (presence.setEditing(folderId, socket.id, cardId)) broadcastPresence(folderId); });
@@ -50,7 +62,7 @@ export function attachRealtime(httpServer, origins) {
         const doc = await docs.acquire(cardId, card); socket.data.docs.set(cardId, String(card.folder)); socket.join(docRoom(cardId));
         socket.to(docRoom(cardId)).emit('doc:peer-joined', cardId); // existing peers re-announce awareness for the newcomer
         ack({ ok: true, state: Buffer.from(docs.state(cardId) || new Uint8Array()) , version: card.version });
-      } catch (e) { ack({ ok: false, error: e.status === 403 ? 'You need editor access to co-edit.' : 'Card not found.' }); }
+      } catch (e) { reply('doc:join', ack, a => a.status === 403 ? 'You need editor access to co-edit.' : 'Card not found.')(e); }
     });
     socket.on('doc:update', (cardId, update) => { if (!socket.data.docs.has(cardId) || !update) return; if (docs.apply(cardId, update)) socket.to(docRoom(cardId)).emit('doc:update', cardId, update); });
     socket.on('doc:awareness', (cardId, update) => { if (socket.data.docs.has(cardId) && update) socket.to(docRoom(cardId)).emit('doc:awareness', cardId, update); });
@@ -68,18 +80,18 @@ export function attachRealtime(httpServer, origins) {
         const cards = await Card.find({ folder: folder.id }).select('front back').lean();
         const room = rooms.create({ folder, host: socket.data.user, cards: cards.map(c => ({ ...c, id: c._id })), count: options?.count, seconds: options?.seconds });
         enterRoom(room.code); ack({ ok: true, code: room.code, room: rooms.snapshot(room.code, socket.data.user.id) });
-      } catch (e) { ack({ ok: false, error: e.status === 400 ? e.message : e.status === 404 ? 'Folder not found.' : 'No access.' }); }
+      } catch (e) { reply('room:create', ack, a => a.status === 400 || a.status === 402 ? a.message : a.status === 404 ? 'Folder not found.' : 'No access.')(e); }
     });
     socket.on('room:join', (code, ack = () => {}) => {
       if (!signedIn(ack)) return;
       try { const room = rooms.join(code, socket.data.user); enterRoom(room.code); ack({ ok: true, code: room.code, room: rooms.snapshot(room.code, socket.data.user.id) }); }
-      catch (e) { ack({ ok: false, error: e.message }); }
+      catch (e) { reply('room:join', ack)(e); }
     });
     const leaveRoom = code => { if (!socket.data.rooms.has(code)) return; socket.data.rooms.delete(code); socket.leave(quizRoom(code)); rooms.leave(code, socket.data.user?.id); };
     socket.on('room:leave', leaveRoom);
-    const hostAction = fn => (code, ack = () => {}) => { if (!socket.data.rooms.has(code)) return; try { fn(code); ack({ ok: true }); } catch (e) { ack({ ok: false, error: e.message }); } };
-    socket.on('room:start', hostAction(code => rooms.start(code, socket.data.user.id)));
-    socket.on('room:next', hostAction(code => rooms.next(code, socket.data.user.id)));
+    const hostAction = (event, fn) => (code, ack = () => {}) => { if (!socket.data.rooms.has(code)) return; try { fn(code); ack({ ok: true }); } catch (e) { reply(event, ack)(e); } };
+    socket.on('room:start', hostAction('room:start', code => rooms.start(code, socket.data.user.id)));
+    socket.on('room:next', hostAction('room:next', code => rooms.next(code, socket.data.user.id)));
     socket.on('room:answer', (code, choice) => { if (socket.data.rooms.has(code)) rooms.answer(code, socket.data.user.id, choice); });
     socket.on('disconnect', async () => { for (const f of presence.drop(socket.id)) broadcastPresence(f); for (const cardId of [...socket.data.docs.keys()]) await leaveDoc(cardId); for (const code of [...socket.data.rooms]) leaveRoom(code); });
   });

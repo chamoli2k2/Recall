@@ -40,7 +40,7 @@ integration('handshake rejects untrusted cross-origin connections and accepts sa
 });
 integration('joining a folder room enforces the same access rules as HTTP and shows presence', async () => {
   const [o, e, x, anon] = [client(owner), client(editor), client(outsider), client(null)]; await Promise.all([o, e, x, anon].map(connected));
-  assert.deepEqual(await emit(x, 'folder:join', folderId), { ok: false, error: 'Folder not found.' });
+  assert.deepEqual(await emit(x, 'folder:join', folderId), { ok: false, error: 'Folder not found.', code: 'NOT_FOUND' });
   assert.equal((await emit(anon, 'folder:join', folderId)).ok, false, 'anonymous cannot watch a private folder');
   const joined = await emit(o, 'folder:join', folderId); assert.equal(joined.ok, true); assert.equal(joined.presence.length, 1);
   const [, list] = await Promise.all([emit(e, 'folder:join', folderId), once(o, 'presence', (id, l) => id === folderId && l.length === 2)]).then(([, [, l]]) => [null, l]);

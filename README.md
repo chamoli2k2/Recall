@@ -101,6 +101,12 @@ Source is stored as plain text. `RichText.jsx` renders: cloze markers → `marke
 
 Owner invites by username (`viewer` or `editor`). `visibility: global` makes the folder readable to anyone. Copying deep-copies cards and media in one transaction so the copy does not depend on the original. Images are decoded with `sharp` to WebP (EXIF stripped, 1600 px / 25 MP cap).
 
+### Error handling
+
+One classifier decides what every failure means. `toAppError` turns anything thrown anywhere — a Zod issue, a Mongo duplicate key or `CastError`, a Multer limit, a malformed JSON body, or a plain bug — into an `AppError` carrying an HTTP status, a stable machine-readable `code`, and an `expose` flag. Express, Socket.IO, and the process-level handlers all funnel through it, so a validation failure looks the same whether it arrived over HTTP or a socket.
+
+`expose` is the security boundary: anything that is not deliberately thrown is treated as a bug, logged with its stack, and answered with a generic message, so a connection string in a driver error can never reach a client. Every request gets an id (reused from `X-Request-Id` when the caller supplies a safe one), returned in both the response header and the error body, and carried through services in an `AsyncLocalStorage` so a log line written deep in a service can be tied back to what the user saw. Clients raise a matching `ApiError` with the same status, code, and request id; `reportError` is the single place a failure becomes a toast, and a React error boundary keeps a render crash from blanking the app.
+
 ### Notifications
 
 An **observer** sits between the things that happen and the ways people hear about them. A producer calls `notify(recipient, type, { actor, data })` and knows nothing beyond that; `NotificationCenter` walks its subscribed channels in registration order:

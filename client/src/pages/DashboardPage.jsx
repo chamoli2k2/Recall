@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ImageOff, Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { reportError } from '../services/errors';
 import { useApp, useLoad } from '../hooks/useApp';
 import { Button, Loading, ErrorState, Empty, Modal } from '../components/ui';
 import { ACCOUNTS, isSuperadmin, planById } from '../../../shared/account.js';
@@ -26,14 +27,14 @@ export default function DashboardPage() {
   const { data: orders, loading: lo, error: eo } = useLoad(() => api('/admin/orders'), [revision]);
   async function setAccount(id, account) {
     try { await api(`/admin/users/${id}`, { method: 'PATCH', body: { account } }); refresh(); toast.success('Role updated'); }
-    catch (e) { toast.error(e.message); }
+    catch (e) { reportError(e); }
   }
   async function decide(id, status) {
     try {
       await api(`/admin/orders/${id}`, { method: 'PATCH', body: { status } });
       setOpen(o => o && o.id === id ? { ...o, status } : o);
       refresh(); toast.success(status === 'approved' ? 'Premium granted' : 'Request declined');
-    } catch (e) { toast.error(e.message); }
+    } catch (e) { reportError(e); }
   }
   const people = data?.users || [];
   const pending = (orders?.orders || []).filter(o => o.status === 'pending');

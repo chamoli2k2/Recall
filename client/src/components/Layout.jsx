@@ -4,13 +4,13 @@ import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Se
 import { Avatar, Button, Modal } from './ui';
 import { useApp, useLoad } from '../hooks/useApp';
 import { api } from '../services/api';
+import { reportError } from '../services/errors';
 import FolderModal from './FolderModal';
 import ThemeToggle from './ThemeToggle';
 import NotificationBell from './NotificationBell';
 import SiteFooter from './SiteFooter';
 import { PremiumMark } from './PremiumMark';
 import { hasDashboard, hasPremium } from '../../../shared/account.js';
-import { toast } from 'sonner';
 const SIDEBAR = { min: 196, max: 400, default: 240, key: 'recall:sidebar' };
 const clampWidth = px => Math.min(SIDEBAR.max, Math.max(SIDEBAR.min, Math.round(px)));
 /** Width lives in a CSS variable so one drag moves the sidebar and the workspace together.
@@ -47,7 +47,7 @@ export default function Layout() {
   const nav = [['/', LibraryBig, 'My library', false], ['/projects', FolderOpen, 'Projects', true], ['/friends', UserPlus, 'Friends', false], ['/shared', Users, 'Shared with me', false], ['/explore', Compass, 'Explore', false], ['/progress', ChartNoAxesCombined, 'My progress', false], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz', true]]), ...(hasDashboard(user) ? [['/dashboard', LayoutDashboard, 'Dashboard', false]] : [])];
   async function signOut() {
     try { if (!isDemo) await api('/auth/logout', { method: 'POST' }); setUser(null); setMobile(false); navigate('/'); }
-    catch (e) { toast.error(e.message); }
+    catch (e) { reportError(e); }
   }
   async function onSearch(value) {
     setQuery(value);
