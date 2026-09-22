@@ -209,8 +209,14 @@ export function TeamPage() {
       </tr>)}</tbody>
     </table></div>
 
-    {isTeacher && <><div className="premium-card-head premium-card-head-inline"><h2>How the group is doing</h2><Link className="text-button" to={`/teams/${id}/progress`}><BarChart3 size={15}/> Open the report</Link></div>
-      <p className="dash-muted">Coverage, accuracy, and what each person still has due. Everyone keeps their own progress; this only reads it.</p></>}
+    {isTeacher && <section className="team-report">
+      <span className="team-card-icon"><BarChart3 size={20}/></span>
+      <div>
+        <h2>See how {team.kind === 'classroom' ? 'the class' : 'everyone'} is getting on</h2>
+        <p>Who has covered the material, how well it is sticking, and what each person still has due. Everyone keeps their own study progress; the report only reads it.</p>
+      </div>
+      <Link className="button secondary" to={`/teams/${id}/progress`}><BarChart3 size={15}/> Open the report</Link>
+    </section>}
 
     {inviting && <InviteModal teamId={id} kind={team.kind} onClose={() => setInviting(false)}/>}
     {buying && <SeatsModal team={team} onClose={() => setBuying(false)} onDone={() => { setBuying(false); refresh(); }}/>}
