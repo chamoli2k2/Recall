@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Shield } from 'lucide-react';
+import { ImageOff, Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { useApp, useLoad } from '../hooks/useApp';
-import { Button, Loading, ErrorState, Empty } from '../components/ui';
+import { Button, Loading, ErrorState, Empty, Modal } from '../components/ui';
 import { ACCOUNTS, isSuperadmin } from '../../../shared/account.js';
+const when = iso => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 export default function DashboardPage() {
   const { user, revision, refresh } = useApp();
+  const [open, setOpen] = useState(null);
   const [tab, setTab] = useState('users');
   const [q, setQ] = useState('');
   const { data, loading, error } = useLoad(() => api(`/admin/users${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`), [revision, q]);
@@ -16,8 +18,11 @@ export default function DashboardPage() {
     catch (e) { toast.error(e.message); }
   }
   async function decide(id, status) {
-    try { await api(`/admin/orders/${id}`, { method: 'PATCH', body: { status } }); refresh(); toast.success(status === 'approved' ? 'Premium granted' : 'Request declined'); }
-    catch (e) { toast.error(e.message); }
+    try {
+      await api(`/admin/orders/${id}`, { method: 'PATCH', body: { status } });
+      setOpen(o => o && o.id === id ? { ...o, status } : o);
+      refresh(); toast.success(status === 'approved' ? 'Premium granted' : 'Request declined');
+    } catch (e) { toast.error(e.message); }
   }
   const people = data?.users || [];
   const pending = (orders?.orders || []).filter(o => o.status === 'pending');
@@ -31,6 +36,32 @@ export default function DashboardPage() {
       <form className="folder-search dash-search" onSubmit={e => e.preventDefault()}><input aria-label="Search users" placeholder="Search name, username, email" value={q} onChange={e => setQ(e.target.value)}/></form>
       {loading ? <Loading/> : error ? <ErrorState message={error}/> : !people.length ? <Empty title="No users" text="Try another search."/> : <div className="dash-table-wrap"><table className="dash-table"><thead><tr><th>Person</th><th>Email</th><th>Role</th></tr></thead><tbody>{people.map(p => <tr key={p.id}><td><strong>{p.name}</strong><span>@{p.username}</span></td><td>{p.email || '—'}</td><td>{p.id === user.id ? <span className="dash-self">{p.account} · you</span> : <select aria-label={`Role for ${p.username}`} value={p.account || 'normal'} onChange={e => setAccount(p.id, e.target.value)}>{ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}</select>}</td></tr>)}</tbody></table></div>}
     </>}
-    {tab === 'orders' && (lo ? <Loading/> : eo ? <ErrorState message={eo}/> : !(orders?.orders || []).length ? <Empty title="No Premium requests" text="When someone submits the buy form, they appear here."/> : <ul className="people-list">{orders.orders.map(o => <li key={o.id} className="order-row"><div className="person-row"><Shield size={16}/><div><strong>{o.name}</strong><span>{o.email} · {o.phone} · {o.country}</span><span>{o.address}</span><span>{o.status}{o.user?.username ? ` · @${o.user.username}` : ''}</span></div>{o.hasProof && <a className="proof-link" href={o.proofUrl} target="_blank" rel="noreferrer"><img className="proof-thumb" src={o.proofUrl} alt="Payment screenshot"/></a>}</div>{o.status === 'pending' && <div className="person-actions"><Button className="primary" onClick={() => decide(o.id, 'approved')}>Approve</Button><Button className="secondary" onClick={() => decide(o.id, 'declined')}>Decline</Button></div>}</li>)}</ul>)}
+    {tab === 'orders' && (lo ? <Loading/> : eo ? <ErrorState message={eo}/> : !(orders?.orders || []).length ? <Empty title="No Premium requests" text="When someone submits the buy form, they appear here."/> : <ul className="order-grid">{orders.orders.map(o => <li key={o.id}>
+      <button type="button" className="order-card" onClick={() => setOpen(o)}>
+        <span className="order-card-proof">{o.hasProof ? <><img src={o.proofUrl} alt=""/><span className="order-card-zoom"><Maximize2 size={15}/></span></> : <ImageOff size={20}/>}</span>
+        <span className="order-card-body">
+          <strong>{o.name}</strong>
+          <span>{o.user?.username ? `@${o.user.username} · ` : ''}{o.email}</span>
+          <span>{when(o.createdAt)}</span>
+        </span>
+        <span className={`order-status is-${o.status}`}>{o.status}</span>
+      </button>
+    </li>)}</ul>)}
+    <Modal wide open={!!open} onClose={() => setOpen(null)} title={open ? `Premium request — ${open.name}` : ''} description="Check the payment screenshot against the details before approving.">
+      {open && <div className="order-detail">
+        <div className="order-detail-proof">{open.hasProof ? <a href={open.proofUrl} target="_blank" rel="noreferrer" title="Open the full image"><img src={open.proofUrl} alt={`Payment screenshot from ${open.name}`}/></a> : <span className="order-detail-noproof"><ImageOff size={24}/> No screenshot on this request</span>}</div>
+        <dl className="order-detail-list">
+          <div><dt>Status</dt><dd><span className={`order-status is-${open.status}`}>{open.status}</span></dd></div>
+          <div><dt>Account</dt><dd>{open.user?.username ? `@${open.user.username}` : 'Deleted user'}</dd></div>
+          <div><dt>Email</dt><dd>{open.email}</dd></div>
+          <div><dt>Phone</dt><dd>{open.phone}</dd></div>
+          <div><dt>Country</dt><dd>{open.country}</dd></div>
+          <div><dt>Address</dt><dd>{open.address}</dd></div>
+          <div><dt>Submitted</dt><dd>{when(open.createdAt)}</dd></div>
+        </dl>
+      </div>}
+      {open?.status === 'pending' ? <div className="modal-actions"><Button className="secondary" onClick={() => decide(open.id, 'declined')}>Decline</Button><Button className="primary" onClick={() => decide(open.id, 'approved')}>Approve Premium</Button></div>
+        : open && <div className="modal-actions"><Button className="secondary" onClick={() => setOpen(null)}>Close</Button></div>}
+    </Modal>
   </>;
 }
