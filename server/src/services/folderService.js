@@ -10,17 +10,18 @@ export async function presentFolder(folder, user) {
   const role = roleOf(folder, user);
   // Public readers see counts, never a list of private invitees.
   if (role !== 'owner' && !folder.members.some(m => String(m.user._id) === String(user?._id))) json.members = [];
-  return { ...json, role, tags, cardCount: count, memberCount: folder.members.length + 1, saved: !!user?.savedFolders?.some(id => String(id) === folder.id) };
+  return { ...json, role, tags, cardCount: count, memberCount: folder.members.length + 1, likeCount: folder.likeCount || 0, copyCount: folder.copyCount || 0, liked: !!user?.savedFolders?.some(id => String(id) === folder.id), saved: !!user?.savedFolders?.some(id => String(id) === folder.id) };
 }
 export async function listFolders(user, scope) {
   const filter = scope === 'explore' ? { visibility: 'global', archived: false } : { archived: false, $or: [{ owner: user._id }, { 'members.user': user._id }, { _id: { $in: user.savedFolders }, visibility: 'global' }] };
   const folders = await Folder.find(filter).sort({ updatedAt: -1 }).limit(200);
   return Promise.all(folders.map(f => presentFolder(f, user)));
 }
-export async function createFolder(user, body) { return Folder.create({ ...body, owner: user.id }); }
+export async function createFolder(user, body) { const { thumbnail, ...rest } = body; return Folder.create({ ...rest, owner: user.id }); }
 export async function updateFolder(id, user, body) {
   return mutateFolder(id, user, 'owner', async (folder, session) => {
     assert(folder.version === body.version, 409, 'This folder changed. Refresh and try again.', 'VERSION_CONFLICT');
+    if (body.thumbnail) assert(await Media.exists({ _id: body.thumbnail, folder: folder.id }).session(session), 400, 'Thumbnail does not belong to this folder.');
     const { version, ...changes } = body; Object.assign(folder, changes); folder.version += 1;
     await folder.save({ session }); await recordEvent(folder, user, 'folder.updated', folder.title, session); return folder;
   });
@@ -38,6 +39,7 @@ export async function copyFolder(id, user) {
   return mutateFolder(id, user, 'viewer', async (source, session) => {
     const author = await User.findById(source.owner).session(session);
     const [copy] = await Folder.create([{ title: `${source.title} (copy)`, description: source.description, color: source.color, icon: source.icon, owner: user.id, visibility: 'private', copiedFrom: source.id, originalCreator: source.originalCreator || author.username }], { session });
+    source.copyCount = (source.copyCount || 0) + 1; await source.save({ session });
     const cards = await Card.find({ folder: source.id }).session(session);
     const imageMap = new Map();
     for (const card of cards) {
@@ -49,6 +51,22 @@ export async function copyFolder(id, user) {
       }
       await Card.create([{ ...data, folder: copy.id, version: 0, createdBy: user.id, updatedBy: user.id }], { session });
     }
+    if (source.thumbnail) {
+      const original = await Media.findById(source.thumbnail).select('+data').session(session);
+      if (original) { const [thumb] = await Media.create([{ folder: copy.id, uploadedBy: user.id, data: original.data, name: original.name, contentType: original.contentType }], { session }); copy.thumbnail = thumb.id; await copy.save({ session }); }
+    }
     await recordEvent(copy, user, 'folder.copied', copy.title, session); return copy;
   });
+}
+export async function likeFolder(id, user, liked) {
+  await accessFolder(id, user);
+  if (liked) {
+    const r = await User.updateOne({ _id: user.id, savedFolders: { $ne: id } }, { $addToSet: { savedFolders: id } });
+    if (r.modifiedCount) await Folder.updateOne({ _id: id }, { $inc: { likeCount: 1 } });
+  } else {
+    const r = await User.updateOne({ _id: user.id, savedFolders: id }, { $pull: { savedFolders: id } });
+    if (r.modifiedCount) await Folder.updateOne({ _id: id, likeCount: { $gt: 0 } }, { $inc: { likeCount: -1 } });
+  }
+  const fresh = await User.findById(user.id);
+  return presentFolder(await accessFolder(id, fresh), fresh);
 }

@@ -9,7 +9,17 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | POST | `/auth/logout` | End current session |
 | GET | `/auth/me` | Current user, or null |
 | PATCH | `/auth/profile` | Own name, bio, dailyGoal, desiredRetention (0.7–0.97) |
-| GET | `/users/:username` | Public profile and global folders only |
+| GET | `/users?q=` | People search (prefix on username or name, limit 8). Public |
+| GET | `/users/:username` | Public profile: counts (followers, following, friends), `relation` for the viewer, global folders (likeCount, copyCount, thumbnail) |
+| POST / DELETE | `/users/:username/follow` | Signed-in; one-way follow. Unique `(from,to,kind)`; counts `$inc` only when the row changes |
+| POST | `/users/:username/connect` | Send a friend request, or accept if they already requested you |
+| POST | `/users/:username/connect/accept` or `/decline` | Addressee only |
+| DELETE | `/users/:username/connect` | Unfriend |
+| GET | `/me/friends` · `/me/requests` | Accepted friends; incoming pending requests |
+| GET / POST | `/projects` | Owner’s projects; create `{ title, description, visibility }` |
+| GET / PATCH | `/projects/:id` | Global projects are readable; owner updates with version |
+| PATCH | `/projects/:id/archive` | Owner; `{ archived }` |
+| POST / DELETE | `/projects/:id/folders` | Add `{ folderId }` or remove `/:folderId`. Folder stays; many-to-many |
 | GET | `/folders` | Own/shared/saved accessible collections |
 | GET | `/folders?scope=explore` | Public discovery |
 | GET | `/folders/archived` | Own archived folders |
@@ -19,7 +29,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | POST | `/folders/:id/members` | Owner; username and viewer/editor/remove role |
 | POST | `/folders/:id/copy` | Signed-in reader; independent private copy |
 | PATCH | `/folders/:id/archive` | Owner; archived boolean |
-| PATCH | `/folders/:id/save` | Reader; saved boolean |
+| PATCH | `/folders/:id/save` | Reader; `{ saved }` likes/unlikes. `likeCount` on the folder; viewer’s `liked` flag |
 | GET | `/folders/:id/activity` | Member-only activity details |
 | GET | `/folders/:id/cards` | Reader; includes only caller’s progress (FSRS `stability`, `difficulty`, `state`, `retrievability`, and a `preview` of the interval for each rating) |
 | POST | `/folders/:id/cards` | Editor/owner. `front.text`/`back.text` are Markdown source and may contain `$…$`/`$$…$$` LaTeX and Anki-style cloze markers `{{c1::answer::hint}}`; when the front has a cloze, the back may be empty |

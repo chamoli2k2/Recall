@@ -1,11 +1,12 @@
 import bcrypt from 'bcryptjs';
-import { User, Session, Folder } from '../models/index.js';
-import { presentFolder } from '../services/folderService.js';
+import { User, Session } from '../models/index.js';
 import { createSession, hashToken, cookieOptions } from '../middleware/auth.js';
 import { assert } from '../utils/errors.js';
+import { publicProfile as loadProfile, searchUsers } from '../services/socialService.js';
 export const signup = async (req, res) => { const { password, ...body } = req.body; const user = await User.create({ ...body, passwordHash: await bcrypt.hash(password, 12) }); await createSession(res, user); res.status(201).json({ user: await User.findById(user.id) }); };
 export const login = async (req, res) => { const identifier = String(req.body.identifier).toLowerCase().trim(); const user = await User.findOne({ $or: [{ username: identifier }, { email: identifier }] }).select('+passwordHash'); assert(user && await bcrypt.compare(req.body.password, user.passwordHash), 401, 'Username or password is incorrect.'); await createSession(res, user); res.json({ user: await User.findById(user.id) }); };
 export const logout = async (req, res) => { if (req.cookies.recall_session) await Session.deleteOne({ tokenHash: hashToken(req.cookies.recall_session) }); const { maxAge, ...options } = cookieOptions(); res.clearCookie('recall_session', options).json({ ok: true }); };
 export const me = async (req, res) => res.json({ user: req.user ?? null });
 export const profile = async (req, res) => { const user = await User.findByIdAndUpdate(req.user.id, { $set: req.body }, { new: true }); res.json({ user }); };
-export const publicProfile = async (req, res) => { const user = await User.findOne({ username: req.params.username.toLowerCase() }).select('name username bio'); assert(user, 404, 'User not found.'); const folders = await Folder.find({ owner: user.id, visibility: 'global', archived: false }).sort({ updatedAt: -1 }); res.json({ profile: user, folders: await Promise.all(folders.map(f => presentFolder(f, req.user))) }); };
+export const publicProfile = async (req, res) => res.json(await loadProfile(req.params.username, req.user));
+export const searchPeople = async (req, res) => res.json({ users: await searchUsers(req.query.q, req.user?.id) });

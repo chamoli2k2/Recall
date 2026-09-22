@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, RotateCcw, Layers, Users, Brain, Globe2, LockKeyhole, Sparkles, Search } from 'lucide-react';
-import { api } from '../services/api';
+import { api, imageUrl } from '../services/api';
 import { useLoad } from '../hooks/useApp';
 import { FolderIcon, Loading, Avatar, Empty } from '../components/ui';
 function matchesFolder(folder, query) {
@@ -25,15 +25,16 @@ function HeroCard() {
 }
 function PublicFolderCard({ folder }) {
   return <Link className={`home-folder ${folder.color}`} to={`/folders/${folder.id}`}>
-    <div className="home-folder-cover"><span className="folder-icon"><FolderIcon name={folder.icon} size={26}/></span><span className="visibility-badge"><Globe2 size={11}/> Public</span></div>
+    <div className="home-folder-cover">{folder.thumbnail ? <img className="tile-thumb" src={imageUrl(folder.thumbnail)} alt=""/> : <span className="folder-icon"><FolderIcon name={folder.icon} size={26}/></span>}<span className="visibility-badge"><Globe2 size={11}/> Public</span></div>
     <div className="home-folder-body"><h3>{folder.title}</h3><p>{folder.description || 'A public collection of flashcards.'}</p>
-      <div className="home-folder-meta"><span><Avatar user={folder.owner} small/> @{folder.owner?.username}</span><span>{folder.cardCount} cards <ArrowRight size={14}/></span></div></div>
+      <div className="home-folder-meta"><span><Avatar user={folder.owner} small/> @{folder.owner?.username}</span><span>{folder.cardCount} cards · {folder.likeCount || 0} likes · {folder.copyCount || 0} copies</span></div></div>
   </Link>;
 }
 export default function HomePage() {
   const [params, setParams] = useSearchParams();
   const query = params.get('q') || '';
   const { data, loading } = useLoad(() => api('/folders?scope=explore').catch(() => ({ folders: [] })), []);
+  const { data: people } = useLoad(() => query.trim().length >= 2 ? api(`/users?q=${encodeURIComponent(query.trim())}`).catch(() => ({ users: [] })) : Promise.resolve({ users: [] }), [query]);
   const all = data?.folders || [];
   const folders = all.filter(f => matchesFolder(f, query));
   return <div className="home">
@@ -52,7 +53,8 @@ export default function HomePage() {
     </section>
     <section className="home-community" id="library">
       <div className="library-section-heading"><div><span className="eyebrow">THE COMMUNITY LIBRARY</span><h2>Public collections, ready to study</h2></div><Link to="/explore" className="text-button">Explore all <ArrowRight size={15}/></Link></div>
-      <form className="home-search folder-search" onSubmit={e => e.preventDefault()}><Search size={16}/><input aria-label="Search public collections" placeholder="Search public collections…" value={query} onChange={e => setParams(e.target.value ? { q: e.target.value } : {})}/></form>
+      <form className="home-search folder-search" onSubmit={e => e.preventDefault()}><Search size={16}/><input aria-label="Search public collections and people" placeholder="Search collections or people…" value={query} onChange={e => setParams(e.target.value ? { q: e.target.value } : {})}/></form>
+      {people?.users?.length > 0 && <div className="people-hits">{people.users.map(p => <Link key={p.id} className="person-chip" to={`/u/${p.username}`}><Avatar user={p} small/> {p.name} <small>@{p.username}</small></Link>)}</div>}
       {loading ? <Loading/> : !folders.length ? query ? <Empty title="No matching collections" text="Try another word — titles, descriptions, tags, and authors are searchable without an account."/> : <div className="home-empty"><Globe2 size={22}/><p>No public collections yet. Be the first — create an account and publish a folder.</p></div> : <div className="home-folder-grid">{folders.map(f => <PublicFolderCard folder={f} key={f.id}/>)}</div>}
       <p className="home-community-note">Anyone can read and flip public cards. To save a collection, make a private copy, track progress, or create your own, you’ll need an account — it takes a few seconds.</p>
     </section>

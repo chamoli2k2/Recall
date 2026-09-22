@@ -1,0 +1,11 @@
+import * as social from '../services/socialService.js';
+export const search = async (req, res) => res.json({ users: await social.searchUsers(req.query.q, req.user?.id) });
+export const profile = async (req, res) => res.json(await social.publicProfile(req.params.username, req.user));
+export const follow = async (req, res) => res.json({ relation: await social.follow(req.user, req.params.username, true) });
+export const unfollow = async (req, res) => res.json({ relation: await social.follow(req.user, req.params.username, false) });
+export const connect = async (req, res) => res.json({ relation: await social.connect(req.user, req.params.username) });
+export const accept = async (req, res) => res.json({ relation: await social.accept(req.user, req.params.username) });
+export const decline = async (req, res) => res.json({ relation: await social.decline(req.user, req.params.username) });
+export const unfriend = async (req, res) => res.json({ relation: await social.unfriend(req.user, req.params.username) });
+export const friends = async (req, res) => res.json({ people: await social.listFriends(req.user) });
+export const requests = async (req, res) => res.json({ people: await social.listRequests(req.user) });

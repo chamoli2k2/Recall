@@ -30,6 +30,8 @@ Recall is a **single-origin monolith**. The browser talks HTTPS to Express. Expr
 
 Folder is the **aggregate root**. Cards do not carry an ACL; they inherit from the folder. Progress is unique on `(user, card)` so collaborators never share ratings. Revisions store the previous full snapshot. `CardDoc` caches Yjs state for open cards and is re-seeded from `Card` if the card is newer.
 
+Social graph is a single `relationships` collection: unique `(from, to, kind)` with `kind` `follow` or `connect` and `status` `active` or `pending`. Profiles store only `followers` / `following` / `friends` counts (`$inc` on write). Follow and friendship never grant folder access. Folder `likeCount` / `copyCount` are denormalized; likes reuse `savedFolders`. A **project** is owner-scoped, private or global, and holds folder ids (`$addToSet`). A folder can sit in many projects or none.
+
 ## Concurrency control
 
 ![Concurrency control](docs/concurrency.png)

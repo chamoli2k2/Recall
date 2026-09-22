@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Globe2, RotateCcw, LogIn, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { api, imageUrl } from '../services/api';
-import { useLoad } from '../hooks/useApp';
-import { Avatar, FolderIcon, Loading, ErrorState, Tag, Empty } from '../components/ui';
+import { useApp, useLoad } from '../hooks/useApp';
+import { Avatar, FolderIcon, Loading, ErrorState, Tag, Empty, Button } from '../components/ui';
 import ThemeToggle from '../components/ThemeToggle';
+import SiteFooter from '../components/SiteFooter';
 import RichText, { sideOf, plainText } from '../components/RichText';
 function matchesFolder(folder, query) {
   if (!query) return true;
@@ -19,7 +21,7 @@ export function PublicShell({ children, wide }) {
       <form className="public-search folder-search" onSubmit={e => { e.preventDefault(); navigate(query.trim() ? `/?q=${encodeURIComponent(query.trim())}#library` : '/#library'); }}><Search size={16}/><input aria-label="Search public collections" placeholder="Search collections…" value={query} onChange={e => setQuery(e.target.value)}/></form>
       <div className="public-header-actions"><ThemeToggle/><Link className="button secondary public-signin" to="/login"><LogIn size={16}/> Sign in</Link><Link className="button primary" to="/signup">Get started <ArrowRight size={16}/></Link></div></header>
     <main>{children}</main>
-    <footer className="public-footer"><span>Made for a curious mind.</span><span><Link to="/explore">Explore</Link> · <Link to="/login">Sign in</Link> · <Link to="/signup">Create an account</Link></span></footer>
+    <SiteFooter/>
   </div>;
 }
 export function PublicFolderPage() {
@@ -28,9 +30,26 @@ export function PublicFolderPage() {
   return <><Link to="/explore" className="back-link"><ArrowLeft size={16}/> Explore collections</Link><div className="page-heading"><div><span className="eyebrow">A PUBLIC COLLECTION</span><h1>{data.folder.title}</h1><p>{data.folder.description}</p><Link to={`/u/${data.folder.owner.username}`} className="text-button">by @{data.folder.owner.username}</Link></div><div className={`large-folder-icon ${data.folder.color}`}><FolderIcon name={data.folder.icon} size={32}/></div></div><div className="folder-study-strip public-study-strip"><div><span className="study-strip-icon"><Globe2 size={22}/></span><div><h3>Flip any card to study it right here.</h3><p>Sign in to save this collection, make a private copy, and track your progress.</p></div></div><div><Link className="button primary" to="/signup">Create a free account</Link><Link className="button secondary" to="/login">Sign in</Link></div></div><div className="flashcard-grid">{data.cards.map((card, i) => { const side = sideOf(card, flipped[card.id]); return <article className="flashcard-item" key={card.id}><div className="flashcard-top">{i + 1} · {flipped[card.id] ? 'ANSWER' : 'QUESTION'}</div><button className="card-content" aria-label={`Flip card ${i + 1}`} onClick={() => setFlipped(f => ({ ...f, [card.id]: !f[card.id] }))}>{side.image && <img src={imageUrl(side.image)} alt={plainText(side.text) || 'Flashcard image'}/>}<RichText text={side.text} cloze={side.cloze}/></button><div className="flashcard-footer"><div>{card.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}</div><RotateCcw size={14}/></div></article>; })}</div></>;
 }
 export function ProfilePage() {
-  const { username } = useParams(); const { data, loading, error } = useLoad(() => api(`/users/${username}`), [username]);
+  const { username } = useParams(); const { user, revision, refresh } = useApp();
+  const { data, loading, error } = useLoad(() => api(`/users/${username}`), [username, revision]);
   if (loading) return <Loading/>; if (error) return <ErrorState message={error}/>;
-  return <><Link to="/explore" className="back-link"><ArrowLeft size={16}/> Explore collections</Link><div className="profile-header public-profile"><Avatar user={data.profile}/><div><span className="eyebrow">CURIOUS MIND</span><h1>{data.profile.name}</h1><p>@{data.profile.username}</p>{data.profile.bio && <p>{data.profile.bio}</p>}</div></div><div className="library-section-heading"><h2>Public collections <span>{data.folders.length}</span></h2></div>{!data.folders.length ? <Empty title="A little mystery" text="This learner hasn’t published any collections yet."/> : <div className="folder-grid">{data.folders.map(folder => <Link className="public-folder" to={`/folders/${folder.id}`} key={folder.id}><div className={`large-folder-icon ${folder.color}`}><FolderIcon name={folder.icon} size={28}/></div><h3>{folder.title}</h3><p>{folder.description}</p><span>{folder.cardCount} cards <ArrowRight size={15}/></span></Link>)}</div>}</>;
+  const p = data.profile; const rel = p.relation || { following: false, friendship: user?.username === p.username ? 'self' : 'none' };
+  async function act(path, method = 'POST') { try { await api(`/users/${p.username}/${path}`, { method }); refresh(); } catch (e) { toast.error(e.message); } }
+  return <><Link to="/" className="back-link"><ArrowLeft size={16}/> Back</Link>
+    <div className="profile-header public-profile"><Avatar user={p}/>
+      <div><span className="eyebrow">LEARNER</span><h1>{p.name}</h1><p>@{p.username}</p>{p.bio && <p>{p.bio}</p>}
+        <div className="profile-counts"><span><strong>{p.followers || 0}</strong> followers</span><span><strong>{p.following || 0}</strong> following</span><span><strong>{p.friends || 0}</strong> friends</span></div>
+      </div>
+      {user && rel.friendship !== 'self' && <div className="profile-actions">
+        <Button className={rel.following ? 'secondary' : 'primary'} onClick={() => act('follow', rel.following ? 'DELETE' : 'POST')}>{rel.following ? 'Following' : 'Follow'}</Button>
+        {rel.friendship === 'none' && <Button className="secondary" onClick={() => act('connect')}>Connect</Button>}
+        {rel.friendship === 'outgoing' && <Button className="secondary" disabled>Requested</Button>}
+        {rel.friendship === 'incoming' && <><Button className="primary" onClick={() => act('connect/accept')}>Accept</Button><Button className="secondary" onClick={() => act('connect/decline')}>Decline</Button></>}
+        {rel.friendship === 'friends' && <Button className="secondary" onClick={() => act('connect', 'DELETE')}>Friends</Button>}
+      </div>}
+    </div>
+    <div className="library-section-heading"><h2>Public collections <span>{data.folders.length}</span></h2></div>
+    {!data.folders.length ? <Empty title="A little mystery" text="This learner hasn’t published any collections yet."/> : <div className="folder-grid">{data.folders.map(folder => <Link className="public-folder" to={`/folders/${folder.id}`} key={folder.id}>{folder.thumbnail ? <img className="folder-thumb" src={imageUrl(folder.thumbnail)} alt=""/> : <div className={`large-folder-icon ${folder.color}`}><FolderIcon name={folder.icon} size={28}/></div>}<h3>{folder.title}</h3><p>{folder.description}</p><span>{folder.cardCount} cards · {folder.likeCount || 0} likes · {folder.copyCount || 0} copies</span></Link>)}</div>}</>;
 }
 export function PublicExplorePage() {
   const [params, setParams] = useSearchParams(); const query = params.get('q') || '';

@@ -1,17 +1,23 @@
 import { useState } from 'react';
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
-import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, PanelLeftClose, Menu as MenuIcon, Search, Command, Archive, LogOut, Layers, Swords } from 'lucide-react';
+import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, Menu as MenuIcon, Search, Archive, LogOut, Layers, Swords, FolderOpen, UserPlus } from 'lucide-react';
 import { Avatar, Button, Modal } from './ui';
 import { useApp, useLoad } from '../hooks/useApp';
 import { api } from '../services/api';
 import FolderModal from './FolderModal';
 import ThemeToggle from './ThemeToggle';
+import SiteFooter from './SiteFooter';
 import { toast } from 'sonner';
 export default function Layout() {
   const { user, isDemo, revision, setUser } = useApp(); const navigate = useNavigate();
-  const [create, setCreate] = useState(false), [mobile, setMobile] = useState(false), [help, setHelp] = useState(false), [query, setQuery] = useState('');
+  const [create, setCreate] = useState(false), [mobile, setMobile] = useState(false), [help, setHelp] = useState(false), [query, setQuery] = useState(''), [people, setPeople] = useState([]);
   const { data } = useLoad(() => api('/folders'), [revision]);
-  const nav = [['/', LibraryBig, 'My library'], ['/shared', Users, 'Shared with me'], ['/explore', Compass, 'Explore'], ['/progress', ChartNoAxesCombined, 'My progress'], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz']])];
+  const nav = [['/', LibraryBig, 'My library'], ['/projects', FolderOpen, 'Projects'], ['/friends', UserPlus, 'Friends'], ['/shared', Users, 'Shared with me'], ['/explore', Compass, 'Explore'], ['/progress', ChartNoAxesCombined, 'My progress'], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz']])];
+  async function onSearch(value) {
+    setQuery(value);
+    if (value.trim().length < 2) { setPeople([]); return; }
+    try { const d = await api(`/users?q=${encodeURIComponent(value.trim())}`); setPeople(d.users || []); } catch { setPeople([]); }
+  }
   return <div className="app-shell">
     {mobile && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobile(false)}/>}
     <aside className={`sidebar ${mobile ? 'open' : ''}`}>
@@ -23,9 +29,9 @@ export default function Layout() {
       <div className="sidebar-folders">{data?.folders?.filter(f => f.role === 'owner').slice(0, 5).map(f => <NavLink key={f.id} to={`/folders/${f.id}`} onClick={() => setMobile(false)} className="folder-link"><span className={`folder-dot ${f.color}`}/><span>{f.title}</span></NavLink>)}</div>
       <div className="sidebar-bottom"><button className="small-tip" onClick={() => setHelp(true)}><span className="tip-icon"><Layers size={20}/></span><strong>A little learning, every day.</strong><span>Your future self will thank you.</span><span className="tip-link">Make it a habit <ArrowUpRight size={14}/></span></button><NavLink to="/archive" className="nav-link"><Archive size={18}/> Archived folders</NavLink><NavLink to="/settings" className="nav-link"><Settings2 size={18}/> Settings</NavLink><div className="account"><Avatar user={user}/><div><strong>{user?.name || 'Guest'}</strong><span>@{user?.username || 'guest'}</span></div>{!isDemo && <button aria-label="Sign out" className="icon-button" onClick={async () => { try { await api('/auth/logout', { method: 'POST' }); setUser(null); navigate('/'); } catch (e) { toast.error(e.message); } }}><LogOut size={17}/></button>}</div></div>
     </aside>
-    <div className="workspace"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-toggle" aria-label="Open navigation" onClick={() => setMobile(true)}><MenuIcon size={22}/></button><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>Your learning space</strong></div><form className="global-search" onSubmit={e => { e.preventDefault(); navigate(`/?q=${encodeURIComponent(query)}`); }}><Search size={17}/><input aria-label="Search folders" placeholder="Find a folder…" value={query} onChange={e => setQuery(e.target.value)}/><kbd>↵</kbd></form><ThemeToggle/><Link to="/settings" aria-label="Your profile"><Avatar user={user} small/></Link></header>
+    <div className="workspace"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-toggle" aria-label="Open navigation" onClick={() => setMobile(true)}><MenuIcon size={20}/></button><strong>Library</strong></div><form className="global-search" onSubmit={e => { e.preventDefault(); if (people[0]) navigate(`/u/${people[0].username}`); else navigate(`/?q=${encodeURIComponent(query)}`); }}><Search size={16}/><input aria-label="Search folders and people" placeholder="Folders or people…" value={query} onChange={e => onSearch(e.target.value)}/>{people.length > 0 && <div className="search-people">{people.map(p => <Link key={p.id} to={`/u/${p.username}`} onClick={() => { setQuery(''); setPeople([]); }}><Avatar user={p} small/><span>{p.name} <small>@{p.username}</small></span></Link>)}</div>}</form><ThemeToggle/><Link to={`/u/${user?.username || ''}`} aria-label="Your profile"><Avatar user={user} small/></Link></header>
       {isDemo && <div className="demo-banner"><span className="demo-pill">INTERACTIVE PREVIEW</span><span>Try the sample workspace. Changes reset on refresh; accounts and live sharing require the backend.</span></div>}
-      <main className="main-content"><Outlet/></main><footer className="app-footer"><span>Made for a curious mind.</span><span>One card at a time.</span></footer>
+      <main className="main-content"><Outlet/></main><SiteFooter/>
     </div>
     {create && <FolderModal onClose={() => setCreate(false)}/>}
     <Modal open={help} onClose={() => setHelp(false)} title="Make room for a little learning" description="A small routine is easier to keep."><div className="help-copy"><p>Choose a daily goal you can comfortably finish. Start with a short review, try to recall the answer, then flip the card.</p><p>Rate each answer honestly. Recall will bring difficult cards back sooner and give familiar cards more space.</p><Button className="primary" onClick={() => { setHelp(false); navigate('/settings'); }}>Set your daily goal <ArrowUpRight size={17}/></Button></div></Modal>

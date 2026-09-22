@@ -11,7 +11,17 @@ export async function demoRequest(path, options = {}) {
   const method = options.method || 'GET'; const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body || {};
   const parts = path.split('?')[0].split('/').filter(Boolean); const [entity, id, action] = parts;
   if (path === '/auth/me') return { user: clone(user) };
-  if (entity === 'users') { const profile = [user, ...collaborators].find(u => u.username === id); if (!profile) error('User not found.'); return { profile: clone(profile), folders: clone(folders.filter(f => f.owner.id === profile.id && f.visibility === 'global' && !f.archived)) }; }
+  if (entity === 'users') {
+    if (!id) { const q = new URLSearchParams(path.split('?')[1] || '').get('q') || ''; return { users: [user, ...collaborators].filter(u => u.username.startsWith(q.toLowerCase()) || u.name.toLowerCase().startsWith(q.toLowerCase())).map(u => ({ id: u.id, username: u.username, name: u.name })) }; }
+    const profile = [user, ...collaborators].find(u => u.username === id); if (!profile) error('User not found.');
+    return { profile: { ...clone(profile), followers: 0, following: 0, friends: 0, relation: { following: false, friendship: profile.id === user.id ? 'self' : 'none' } }, folders: clone(folders.filter(f => f.owner.id === profile.id && f.visibility === 'global' && !f.archived)) };
+  }
+  if (path === '/me/friends' || path === '/me/requests') return { people: [] };
+  if (entity === 'projects') {
+    if (!id && method === 'GET') return { projects: [] };
+    if (!id && method === 'POST') return { project: { id: uuid(), title: body.title, description: body.description || '', visibility: body.visibility || 'private', folders: [], folderCount: 0, version: 0, role: 'owner' } };
+    error('Projects need a signed-in account outside the preview.');
+  }
   if (path === '/auth/profile') { Object.assign(user, body); return { user: clone(user) }; }
   if (path.startsWith('/auth/')) error('This preview uses a sample account. Run the full app to create real accounts.');
   if (path === '/stats') return { stats: { totalCards: cards.length, due: cards.filter(c => !c.progress?.dueAt || new Date(c.progress.dueAt) <= new Date()).length, reviewed: reviews.length, reviewsToday: reviews.length, mastered: cards.filter(c => c.progress.interval >= 21).length, goal: user.dailyGoal } };

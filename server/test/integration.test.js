@@ -78,3 +78,25 @@ integration('private copies own their image data after access to the source is r
   assert.equal((await editor.get(`/api/media/${copiedImage}`)).status, 200);
   assert.equal((await editor.get(`/api/media/${image.body.id}`)).status, 404);
 });
+integration('follow is one-way, connect needs accept, like and copy counts stay on the folder', async () => {
+  assert.equal((await editor.post('/api/users/owner/follow')).status, 200);
+  const profile = (await editor.get('/api/users/owner')).body.profile;
+  assert.equal(profile.followers, 1); assert.equal(profile.relation.following, true); assert.equal(profile.relation.friendship, 'none');
+  assert.equal((await owner.post('/api/users/editor/connect')).status, 200);
+  assert.equal((await editor.get('/api/me/requests')).body.people[0].username, 'owner');
+  assert.equal((await editor.post('/api/users/owner/connect/accept')).status, 200);
+  assert.equal((await owner.get('/api/users/editor')).body.profile.relation.friendship, 'friends');
+  assert.equal((await owner.get('/api/me/friends')).body.people.some(p => p.username === 'editor'), true);
+  const pub = await owner.post('/api/folders').send({ title: 'Public likes', visibility: 'global' });
+  const like = await editor.patch(`/api/folders/${pub.body.folder.id}/save`).send({ saved: true });
+  assert.equal(like.status, 200); assert.equal(like.body.folder.likeCount, 1); assert.equal(like.body.folder.liked, true);
+  const copied = await editor.post(`/api/folders/${pub.body.folder.id}/copy`);
+  assert.equal(copied.status, 201);
+  assert.equal((await owner.get(`/api/folders/${pub.body.folder.id}`)).body.folder.copyCount, 1);
+  const project = await editor.post('/api/projects').send({ title: 'Interview prep', visibility: 'private' });
+  assert.equal(project.status, 201);
+  assert.equal((await editor.post(`/api/projects/${project.body.project.id}/folders`).send({ folderId: copied.body.folder.id })).status, 200);
+  const people = await owner.get('/api/users?q=edit');
+  assert.equal(people.status, 200); assert.ok(people.body.users.some(u => u.username === 'editor'));
+});
+
