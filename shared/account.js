@@ -1,7 +1,36 @@
 export const ACCOUNTS = ['normal', 'premium', 'admin', 'superadmin'];
-export const hasPremium = user => ['premium', 'admin', 'superadmin'].includes(user?.account || 'normal');
+const DAY = 86400000;
+
+/** Purchasable plans. `days: null` means the subscription never expires. */
+export const PREMIUM_PLANS = [
+  { id: 'monthly', label: 'Monthly', days: 30, price: 199, blurb: 'Try the full toolkit for a month.' },
+  { id: 'quarterly', label: 'Quarterly', days: 90, price: 499, blurb: 'Three months for the price of two and a half.' },
+  { id: 'yearly', label: 'Yearly', days: 365, price: 1499, blurb: 'The best value if Recall is part of your routine.' },
+  { id: 'lifetime', label: 'Lifetime', days: null, price: 3999, blurb: 'Pay once. Every Premium feature, forever.' },
+];
+export const PLAN_IDS = PREMIUM_PLANS.map(p => p.id);
+export const planById = id => PREMIUM_PLANS.find(p => p.id === id) || null;
+
+/** A subscription with no end date never lapses; staff roles are never gated on one. */
+export const premiumExpired = (user, now = Date.now()) => !!user?.premiumExpiresAt && new Date(user.premiumExpiresAt).getTime() <= now;
 export const hasDashboard = user => ['admin', 'superadmin'].includes(user?.account || 'normal');
 export const isSuperadmin = user => (user?.account || 'normal') === 'superadmin';
+export function hasPremium(user, now = Date.now()) {
+  const account = user?.account || 'normal';
+  if (hasDashboard(user)) return true;
+  return account === 'premium' && !premiumExpired(user, now);
+}
+/** Whole days remaining, or null when the subscription has no end date. Negative once lapsed. */
+export function premiumDaysLeft(user, now = Date.now()) {
+  if (!user?.premiumExpiresAt) return null;
+  return Math.ceil((new Date(user.premiumExpiresAt).getTime() - now) / DAY);
+}
+/** Granting a plan extends an unexpired subscription instead of truncating it. */
+export function premiumExpiryAfter(user, plan, now = Date.now()) {
+  if (!plan || plan.days == null) return null;
+  const current = user?.premiumExpiresAt ? new Date(user.premiumExpiresAt).getTime() : 0;
+  return new Date(Math.max(now, current) + plan.days * DAY);
+}
 
 /** Admin may set normal/premium. Superadmin may set any role. Nobody may change their own role here. */
 export function canAssign(actor, target, next) {

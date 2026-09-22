@@ -12,7 +12,7 @@ export const submit = async (req, res) => {
   assert(data.length <= 3 * 1024 * 1024, 400, 'Payment photo is too large after processing.');
   res.status(201).json({ order: await premium.submitOrder(req.user, body, data) });
 };
-export const mine = async (req, res) => res.json({ order: await premium.myOrder(req.user) });
+export const mine = async (req, res) => res.json(await premium.myOrder(req.user));
 export const proof = async (req, res) => {
   const { data, type } = await premium.proofFor(req.user, req.params.id);
   res.set({ 'Content-Type': type, 'Cache-Control': 'private, no-store' }).send(data);

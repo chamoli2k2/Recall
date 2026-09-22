@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { hasCloze } from '../../../shared/cloze.js';
+import { PLAN_IDS } from '../../../shared/account.js';
 export const idSchema = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid identifier');
 export const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/, 'Use 3–24 letters, numbers, or underscores');
 export const signupSchema = z.object({ username: usernameSchema, name: z.string().trim().min(1).max(60), email: z.email().toLowerCase(), password: z.string().min(10).max(128) });
 export const folderSchema = z.object({ title: z.string().trim().min(1).max(80), description: z.string().max(500).default(''), color: z.enum(['violet', 'blue', 'orange', 'green', 'pink', 'slate']).default('violet'), icon: z.enum(['layers', 'code', 'globe', 'brain', 'book', 'flask', 'terminal', 'palette']).default('layers'), visibility: z.enum(['private', 'global']).default('private'), thumbnail: idSchema.nullable().optional() });
 export const projectSchema = z.object({ title: z.string().trim().min(1).max(80), description: z.string().max(500).default(''), visibility: z.enum(['private', 'global']).default('private') });
-export const premiumOrderSchema = z.object({ name: z.string().trim().min(1).max(80), email: z.email().toLowerCase(), phone: z.string().trim().min(8).max(20), country: z.string().trim().min(2).max(56), address: z.string().trim().min(6).max(300) });
+export const premiumOrderSchema = z.object({ plan: z.enum(PLAN_IDS), name: z.string().trim().min(1).max(80), email: z.email().toLowerCase(), phone: z.string().trim().min(8).max(20), country: z.string().trim().min(2).max(56), address: z.string().trim().min(6).max(300) });
 const side = z.object({ text: z.string().max(10000).default(''), image: idSchema.nullable().optional() });
 const filled = v => v.text.trim() || v.image;
 // A cloze card ({{c1::…}} on the front) needs no back: the hidden text is the answer.

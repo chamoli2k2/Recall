@@ -43,12 +43,14 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | PATCH | `/cards/:id/bookmark` | Reader; own bookmarked boolean |
 | POST | `/reviews` | Reader; cardId, rating, requestId UUID, progress version |
 | GET | `/stats` | Own study statistics: totals, `retention { desired, predicted, observed, sampled, averageStability }`, 14-day `forecast`, memory `states`, `hardest` cards, one-year daily `heatmap`, `streak { current, longest, activeDays }`, `insights[]`, 30-day `ratingMix` |
-| GET / POST | `/premium/order` | Own latest Premium request. POST is multipart: name, email, phone, country, address, and required `proof` image (UPI screenshot) |
+| GET | `/notifications` | Own 30 most recent notifications plus `unread` count. Types: `follow`, `connect.request`, `connect.accepted`, `premium.requested`, `premium.approved`, `premium.declined` |
+| POST | `/notifications/read` | `{ ids?: string[] }`. Omit `ids` to mark everything read. Returns the new `unread` count |
+| GET / POST | `/premium/order` | GET returns `{ order, subscription }` where subscription carries `plan`, `expiresAt`, `daysLeft`, `active`. POST is multipart: `plan` (monthly\|quarterly\|yearly\|lifetime), name, email, phone, country, address, and required `proof` image (UPI screenshot) |
 | GET | `/premium/orders/:id/proof` | Owner or admin; payment screenshot. `Cache-Control: private, no-store` |
-| GET | `/admin/users` | Admin/Superadmin; list accounts (`+email`). `?q=` filters |
-| PATCH | `/admin/users/:id` | `{ account: normal\|premium\|admin\|superadmin }`. Admin may only set normal/premium |
-| GET | `/admin/orders` | Premium payment requests |
-| PATCH | `/admin/orders/:id` | `{ status: approved\|declined }`. Approved promotes a normal user to premium |
+| GET | `/admin/users` | Admin/Superadmin; list accounts (`+email`) with `plan`, `expiresAt`, `daysLeft`, `premiumActive`. `?q=` filters |
+| PATCH | `/admin/users/:id` | `{ account: normal\|premium\|admin\|superadmin }`. Admin may only set normal/premium. A hand-granted role carries no end date; moving off premium clears the subscription |
+| GET | `/admin/orders` | Premium payment requests, including the requested `plan` |
+| PATCH | `/admin/orders/:id` | `{ status: approved\|declined }`. Approving applies the plan's window, extending an unexpired subscription rather than truncating it, and notifies the buyer |
 | GET | `/health` | Liveness: Express is running. Public, no database access, always 200 |
 | GET | `/ready` | Readiness: MongoDB answers a ping within `READINESS_TIMEOUT_MS`. 200 ready / 503 unavailable; no error details |
 

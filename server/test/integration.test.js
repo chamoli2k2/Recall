@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { connectDatabase } from '../src/config/database.js';
 import { createApp } from '../src/app.js';
-import { allModels, Review, User } from '../src/models/index.js';
+import { allModels, Review, User, Notification, Relationship } from '../src/models/index.js';
 const enabled = process.env.RUN_INTEGRATION === '1';
 let mongo, app, owner, editor, outsider, folderId, cardId;
 const password = 'Integration-only-password-2026';
@@ -112,13 +112,45 @@ integration('dashboard is staff-only; premium routes reject a normal account', a
   await owner.patch(`/api/admin/users/${outsiderId}`).send({ account: 'normal' });
   assert.equal((await outsider.get('/api/projects')).status, 402);
   const png = await sharp({ create: { width: 16, height: 16, channels: 3, background: '#22aa66' } }).png().toBuffer();
-  const buy = await outsider.post('/api/premium/order').field('name', 'Out Sider').field('email', 'out@example.test').field('phone', '9999999999').field('country', 'India').field('address', '1 Demo Street').attach('proof', png, 'upi.png');
+  const order = () => outsider.post('/api/premium/order').field('name', 'Out Sider').field('email', 'out@example.test').field('phone', '9999999999').field('country', 'India').field('address', '1 Demo Street');
+  assert.equal((await order().field('plan', 'galactic').attach('proof', png, 'upi.png')).status, 400, 'an unknown plan is rejected');
+  const buy = await order().field('plan', 'monthly').attach('proof', png, 'upi.png');
   assert.equal(buy.status, 201, JSON.stringify(buy.body));
+  assert.equal(buy.body.order.plan, 'monthly');
   assert.equal((await outsider.get(`/api/premium/orders/${buy.body.order.id}/proof`)).status, 200);
-  assert.equal((await outsider.post('/api/premium/order').send({ name: 'No Photo', email: 'a@b.co', phone: '9999999999', country: 'India', address: '1 Demo Street' })).status, 400);
+  assert.equal((await outsider.post('/api/premium/order').send({ plan: 'monthly', name: 'No Photo', email: 'a@b.co', phone: '9999999999', country: 'India', address: '1 Demo Street' })).status, 400);
   const orders = await owner.get('/api/admin/orders');
   assert.equal(orders.status, 200);
   assert.equal((await owner.patch(`/api/admin/orders/${orders.body.orders[0].id}`).send({ status: 'approved' })).status, 200);
   assert.equal((await outsider.get('/api/projects')).status, 200);
+  // Approval writes the plan and a 30-day window onto the account, and the owner is told about it.
+  const mine = await outsider.get('/api/premium/order');
+  assert.equal(mine.body.subscription.plan, 'monthly');
+  assert.ok(mine.body.subscription.daysLeft > 28 && mine.body.subscription.daysLeft <= 30, `daysLeft was ${mine.body.subscription.daysLeft}`);
+  const notified = await outsider.get('/api/notifications');
+  assert.equal(notified.status, 200);
+  assert.ok(notified.body.notifications.some(n => n.type === 'premium.approved'), JSON.stringify(notified.body));
+  // A lapsed subscription closes the Premium routes again without touching the role.
+  await User.updateOne({ username: 'outsider' }, { $set: { premiumExpiresAt: new Date(Date.now() - 86400000) } });
+  assert.equal((await outsider.get('/api/projects')).status, 402);
+});
+integration('follows and connection requests notify the other person, and reads clear the badge', async () => {
+  // Earlier tests already linked these two, so start from a clean graph.
+  await Promise.all([Notification.deleteMany({}), Relationship.deleteMany({}), User.updateMany({}, { $set: { followers: 0, following: 0, friends: 0 } })]);
+  assert.equal((await owner.post('/api/users/editor/follow')).status, 200);
+  assert.equal((await owner.post('/api/users/editor/connect')).status, 200);
+  const inbox = await editor.get('/api/notifications');
+  assert.equal(inbox.status, 200);
+  assert.deepEqual(inbox.body.notifications.map(n => n.type).sort(), ['connect.request', 'follow']);
+  assert.equal(inbox.body.unread, 2);
+  assert.equal(inbox.body.notifications[0].actor.username, 'owner');
+  assert.equal((await editor.post('/api/users/owner/connect/accept')).status, 200);
+  const accepted = await owner.get('/api/notifications');
+  assert.ok(accepted.body.notifications.some(n => n.type === 'connect.accepted'));
+  const read = await editor.post('/api/notifications/read').send({});
+  assert.equal(read.body.unread, 0);
+  assert.equal((await editor.get('/api/notifications')).body.unread, 0);
+  // Nobody sees somebody else's inbox.
+  assert.equal((await outsider.get('/api/notifications')).body.notifications.length, 0);
 });
 

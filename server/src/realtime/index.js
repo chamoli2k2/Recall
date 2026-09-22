@@ -6,6 +6,7 @@ import { onEvent } from './bus.js';
 import { PresenceStore } from './presence.js';
 import { DocStore } from './docs.js';
 import { RoomStore } from './rooms.js';
+import { notifications, presentNotification } from '../services/notificationService.js';
 import { hasPremium } from '../../../shared/account.js';
 const parseCookies = header => Object.fromEntries((header || '').split(';').map(p => p.trim().split('=')).filter(([k]) => k).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
 const same = (origin, host) => { try { return !!origin && new URL(origin).host === host; } catch { return false; } };
@@ -28,8 +29,14 @@ export function attachRealtime(httpServer, origins) {
   });
   const room = id => `folder:${id}`, docRoom = id => `doc:${id}`, quizRoom = code => `quiz:${code}`;
   const broadcastPresence = folderId => io.to(room(folderId)).emit('presence', folderId, presence.list(folderId));
+  // Channel: push a stored notification to every tab the recipient has open.
+  notifications.subscribe(function realtimeChannel(event) {
+    if (!event.stored) return;
+    io.to(`user:${event.to}`).emit('notification', presentNotification(event.stored, event.actor));
+  });
   io.on('connection', socket => {
     socket.data.docs = new Map();
+    if (socket.data.user) socket.join(`user:${socket.data.user.id}`);
     socket.on('folder:join', async (folderId, ack = () => {}) => {
       try { const folder = await accessFolder(folderId, socket.data.user); socket.join(room(folderId)); if (socket.data.user) { presence.join(folderId, socket.id, socket.data.user); broadcastPresence(folderId); } ack({ ok: true, presence: presence.list(folderId), version: folder.version }); }
       catch (e) { ack({ ok: false, error: e.status === 404 ? 'Folder not found.' : 'No access.' }); }

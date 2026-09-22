@@ -4,8 +4,19 @@ import { toast } from 'sonner';
 import { api } from '../services/api';
 import { useApp, useLoad } from '../hooks/useApp';
 import { Button, Loading, ErrorState, Empty, Modal } from '../components/ui';
-import { ACCOUNTS, isSuperadmin } from '../../../shared/account.js';
+import { ACCOUNTS, isSuperadmin, planById } from '../../../shared/account.js';
 const when = iso => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const day = iso => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
+/** Reads the subscription window for one person in the users table. */
+function Subscription({ person }) {
+  if (!['premium', 'admin', 'superadmin'].includes(person.account)) return <span className="dash-muted">—</span>;
+  if (!person.expiresAt) return <span className="sub-pill is-forever">{person.planLabel || 'No end date'}</span>;
+  const left = person.daysLeft;
+  const tone = left <= 0 ? 'is-expired' : left <= 7 ? 'is-soon' : 'is-active';
+  return <span className={`sub-pill ${tone}`} title={`Ends ${day(person.expiresAt)}`}>
+    {person.planLabel || 'Premium'} · {left <= 0 ? `expired ${Math.abs(left)}d ago` : `${left} day${left === 1 ? '' : 's'} left`}
+  </span>;
+}
 export default function DashboardPage() {
   const { user, revision, refresh } = useApp();
   const [open, setOpen] = useState(null);
@@ -34,14 +45,14 @@ export default function DashboardPage() {
     </div>
     {tab === 'users' && <>
       <form className="folder-search dash-search" onSubmit={e => e.preventDefault()}><input aria-label="Search users" placeholder="Search name, username, email" value={q} onChange={e => setQ(e.target.value)}/></form>
-      {loading ? <Loading/> : error ? <ErrorState message={error}/> : !people.length ? <Empty title="No users" text="Try another search."/> : <div className="dash-table-wrap"><table className="dash-table"><thead><tr><th>Person</th><th>Email</th><th>Role</th></tr></thead><tbody>{people.map(p => <tr key={p.id}><td><strong>{p.name}</strong><span>@{p.username}</span></td><td>{p.email || '—'}</td><td>{p.id === user.id ? <span className="dash-self">{p.account} · you</span> : <select aria-label={`Role for ${p.username}`} value={p.account || 'normal'} onChange={e => setAccount(p.id, e.target.value)}>{ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}</select>}</td></tr>)}</tbody></table></div>}
+      {loading ? <Loading/> : error ? <ErrorState message={error}/> : !people.length ? <Empty title="No users" text="Try another search."/> : <div className="dash-table-wrap"><table className="dash-table"><thead><tr><th>Person</th><th>Email</th><th>Subscription</th><th>Role</th></tr></thead><tbody>{people.map(p => <tr key={p.id}><td><strong>{p.name}</strong><span>@{p.username}</span></td><td>{p.email || '—'}</td><td><Subscription person={p}/></td><td>{p.id === user.id ? <span className="dash-self">{p.account} · you</span> : <select aria-label={`Role for ${p.username}`} value={p.account || 'normal'} onChange={e => setAccount(p.id, e.target.value)}>{ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}</select>}</td></tr>)}</tbody></table></div>}
     </>}
     {tab === 'orders' && (lo ? <Loading/> : eo ? <ErrorState message={eo}/> : !(orders?.orders || []).length ? <Empty title="No Premium requests" text="When someone submits the buy form, they appear here."/> : <ul className="order-grid">{orders.orders.map(o => <li key={o.id}>
       <button type="button" className="order-card" onClick={() => setOpen(o)}>
         <span className="order-card-proof">{o.hasProof ? <><img src={o.proofUrl} alt=""/><span className="order-card-zoom"><Maximize2 size={15}/></span></> : <ImageOff size={20}/>}</span>
         <span className="order-card-body">
           <strong>{o.name}</strong>
-          <span>{o.user?.username ? `@${o.user.username} · ` : ''}{o.email}</span>
+          <span>{planById(o.plan)?.label || 'Premium'} · {o.user?.username ? `@${o.user.username}` : o.email}</span>
           <span>{when(o.createdAt)}</span>
         </span>
         <span className={`order-status is-${o.status}`}>{o.status}</span>
@@ -52,6 +63,7 @@ export default function DashboardPage() {
         <div className="order-detail-proof">{open.hasProof ? <a href={open.proofUrl} target="_blank" rel="noreferrer" title="Open the full image"><img src={open.proofUrl} alt={`Payment screenshot from ${open.name}`}/></a> : <span className="order-detail-noproof"><ImageOff size={24}/> No screenshot on this request</span>}</div>
         <dl className="order-detail-list">
           <div><dt>Status</dt><dd><span className={`order-status is-${open.status}`}>{open.status}</span></dd></div>
+          <div><dt>Plan</dt><dd>{planById(open.plan) ? `${planById(open.plan).label} · ₹${planById(open.plan).price.toLocaleString('en-IN')} · ${planById(open.plan).days ? `${planById(open.plan).days} days` : 'no end date'}` : open.plan}</dd></div>
           <div><dt>Account</dt><dd>{open.user?.username ? `@${open.user.username}` : 'Deleted user'}</dd></div>
           <div><dt>Email</dt><dd>{open.email}</dd></div>
           <div><dt>Phone</dt><dd>{open.phone}</dd></div>

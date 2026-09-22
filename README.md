@@ -101,6 +101,19 @@ Source is stored as plain text. `RichText.jsx` renders: cloze markers → `marke
 
 Owner invites by username (`viewer` or `editor`). `visibility: global` makes the folder readable to anyone. Copying deep-copies cards and media in one transaction so the copy does not depend on the original. Images are decoded with `sharp` to WebP (EXIF stripped, 1600 px / 25 MP cap).
 
+### Notifications
+
+An **observer** sits between the things that happen and the ways people hear about them. A producer calls `notify(recipient, type, { actor, data })` and knows nothing beyond that; `NotificationCenter` walks its subscribed channels in registration order:
+
+1. `persistChannel` writes a `Notification` row and hangs it on the event, so the inbox survives a reload.
+2. `realtimeChannel` (registered by the realtime layer, which is why the service has no socket dependency) emits to `user:<id>` — a room every authenticated socket joins on connect, so all of a person's tabs light up at once.
+
+A channel that throws is logged and skipped rather than propagated: a failed notification must never roll back the follow or the approval that triggered it. Adding email later means subscribing one more function. Producers today are follow, connection request, connection accepted, and the three premium transitions; `notifyStaff` fans a new payment request out to every admin. `GET /api/notifications` returns the 30 most recent plus an unread count, and opening the bell is the read receipt.
+
+### Premium plans and expiry
+
+Plans live in `shared/account.js` (`monthly`, `quarterly`, `yearly`, `lifetime`) and are the same list on both sides, so the checkout, the validator, and the dashboard cannot disagree. The buyer picks one; approval stamps `premiumPlan` and `premiumExpiresAt` on the user, where `premiumExpiryAfter` extends an unexpired subscription instead of truncating it and restarts from today if it already lapsed. `hasPremium` then reads as "the role says premium **and** the window is open", so a lapse closes the gated routes without an admin touching the role, and `requirePremium` picks that up on the next request. A lifetime plan stores no end date. Admins see plan, days remaining, and a colour-coded state per account in the dashboard.
+
 ### Security
 
 | Threat | Control |

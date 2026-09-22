@@ -1,5 +1,6 @@
 import { User, Relationship, Folder } from '../models/index.js';
 import { presentFolder } from './folderService.js';
+import { notify } from './notificationService.js';
 import { assert } from '../utils/errors.js';
 
 const publicUser = u => ({ id: u.id, username: u.username, name: u.name, bio: u.bio || '', followers: u.followers || 0, following: u.following || 0, friends: u.friends || 0 });
@@ -55,6 +56,7 @@ export async function follow(me, username, on) {
     try { await Relationship.create({ from: me.id, to: them.id, kind: 'follow', status: 'active' }); }
     catch (e) { if (e.code !== 11000) throw e; return relationFlags(me.id, them.id); }
     await Promise.all([User.updateOne({ _id: them.id }, { $inc: { followers: 1 } }), User.updateOne({ _id: me.id }, { $inc: { following: 1 } })]);
+    await notify(them.id, 'follow', { actor: me });
   } else {
     const del = await Relationship.deleteOne({ from: me.id, to: them.id, kind: 'follow' });
     if (del.deletedCount) await Promise.all([User.updateOne({ _id: them.id, followers: { $gt: 0 } }, { $inc: { followers: -1 } }), User.updateOne({ _id: me.id, following: { $gt: 0 } }, { $inc: { following: -1 } })]);
@@ -68,7 +70,7 @@ export async function connect(me, username) {
   const incoming = await Relationship.findOne({ from: them.id, to: me.id, kind: 'connect' });
   if (incoming?.status === 'pending') return accept(me, username);
   if (incoming?.status === 'active') return { following: (await relationFlags(me.id, them.id)).following, friendship: 'friends' };
-  try { await Relationship.create({ from: me.id, to: them.id, kind: 'connect', status: 'pending' }); }
+  try { await Relationship.create({ from: me.id, to: them.id, kind: 'connect', status: 'pending' }); await notify(them.id, 'connect.request', { actor: me }); }
   catch (e) {
     if (e.code !== 11000) throw e;
     const existing = await Relationship.findOne({ from: me.id, to: them.id, kind: 'connect' });
@@ -82,6 +84,7 @@ export async function accept(me, username) {
   const row = await Relationship.findOneAndUpdate({ from: them.id, to: me.id, kind: 'connect', status: 'pending' }, { $set: { status: 'active' } });
   assert(row, 404, 'No pending request from that user.');
   await Promise.all([User.updateOne({ _id: me.id }, { $inc: { friends: 1 } }), User.updateOne({ _id: them.id }, { $inc: { friends: 1 } })]);
+  await notify(them.id, 'connect.accepted', { actor: me });
   return relationFlags(me.id, them.id);
 }
 

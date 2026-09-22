@@ -10,6 +10,7 @@ import * as social from '../controllers/socialController.js';
 import * as projects from '../controllers/projectController.js';
 import * as admin from '../controllers/adminController.js';
 import * as premium from '../controllers/premiumController.js';
+import * as notifications from '../controllers/notificationController.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requirePremium, requireDashboard } from '../middleware/account.js';
 import { validate, signupSchema, folderSchema, cardSchema, usernameSchema, idSchema, projectSchema } from '../middleware/validate.js';
@@ -52,6 +53,8 @@ r.post('/folders/:id/images', requireAuth, rateLimit({ windowMs: 60000, limit: 2
 const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
 r.post('/folders/:id/import', requireAuth, requirePremium, rateLimit({ windowMs: 60000, limit: 10 }), importUpload.single('file'), a(cards.importFile));
 r.get('/folders/:id/export', requireAuth, requirePremium, a(cards.exportFile));
+r.get('/notifications', requireAuth, a(notifications.list));
+r.post('/notifications/read', requireAuth, validate(z.object({ ids: z.array(idSchema).max(100).optional() })), a(notifications.read));
 r.get('/premium/order', requireAuth, a(premium.mine));
 r.post('/premium/order', requireAuth, rateLimit({ windowMs: 60000, limit: 8 }), upload.single('proof'), a(premium.submit));
 r.get('/premium/orders/:id/proof', requireAuth, a(premium.proof));

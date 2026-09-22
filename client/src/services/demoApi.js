@@ -1,19 +1,26 @@
 import { uuid } from './uuid';
 import { sampleFolders } from '../../../shared/sampleData';
+import { planById } from '../../../shared/account.js';
 const user = { id: 'demo-user', username: 'gaurav', name: 'Gaurav Prakash', bio: 'Learning something new, one card at a time.', dailyGoal: 20, savedFolders: [], account: 'superadmin' };
 const collaborators = [{ id: 'demo-alex', name: 'Alex Morgan', username: 'alex' }, { id: 'demo-maya', name: 'Maya Chen', username: 'maya' }];
 // Stand-in roster so the dashboard has something to manage in the preview.
+const inDays = n => new Date(Date.now() + n * 86400000).toISOString();
 let staff = [
-  { id: user.id, username: user.username, name: user.name, email: 'gaurav@demo.test', account: user.account },
-  { id: 'demo-alex', username: 'alex', name: 'Alex Morgan', email: 'alex@demo.test', account: 'premium' },
-  { id: 'demo-maya', username: 'maya', name: 'Maya Chen', email: 'maya@demo.test', account: 'admin' },
-  { id: 'demo-ada', username: 'ada', name: 'Ada Lovelace', email: 'ada@demo.test', account: 'premium' },
-  { id: 'demo-linus', username: 'linus', name: 'Linus Berg', email: 'linus@demo.test', account: 'normal' },
-  { id: 'demo-sara', username: 'sara', name: 'Sara Iyer', email: 'sara@demo.test', account: 'normal' },
-  { id: 'demo-tom', username: 'tom', name: 'Tom Rivera', email: 'tom@demo.test', account: 'normal' },
+  { id: user.id, username: user.username, name: user.name, email: 'gaurav@demo.test', account: user.account, plan: '', planLabel: '', expiresAt: null, daysLeft: null },
+  { id: 'demo-alex', username: 'alex', name: 'Alex Morgan', email: 'alex@demo.test', account: 'premium', plan: 'yearly', planLabel: 'Yearly', expiresAt: inDays(281), daysLeft: 281 },
+  { id: 'demo-maya', username: 'maya', name: 'Maya Chen', email: 'maya@demo.test', account: 'admin', plan: '', planLabel: '', expiresAt: null, daysLeft: null },
+  { id: 'demo-ada', username: 'ada', name: 'Ada Lovelace', email: 'ada@demo.test', account: 'premium', plan: 'lifetime', planLabel: 'Lifetime', expiresAt: null, daysLeft: null },
+  { id: 'demo-linus', username: 'linus', name: 'Linus Berg', email: 'linus@demo.test', account: 'premium', plan: 'monthly', planLabel: 'Monthly', expiresAt: inDays(4), daysLeft: 4 },
+  { id: 'demo-sara', username: 'sara', name: 'Sara Iyer', email: 'sara@demo.test', account: 'premium', plan: 'quarterly', planLabel: 'Quarterly', expiresAt: inDays(-12), daysLeft: -12 },
+  { id: 'demo-tom', username: 'tom', name: 'Tom Rivera', email: 'tom@demo.test', account: 'normal', plan: '', planLabel: '', expiresAt: null, daysLeft: null },
+];
+let demoNotifications = [
+  { id: 'n1', type: 'connect.request', actor: { id: 'demo-maya', name: 'Maya Chen', username: 'maya' }, data: {}, createdAt: new Date(Date.now() - 6 * 60000).toISOString(), readAt: null },
+  { id: 'n2', type: 'premium.requested', actor: { id: 'demo-sara', name: 'Sara Iyer', username: 'sara' }, data: { plan: 'quarterly' }, createdAt: new Date(Date.now() - 52 * 60000).toISOString(), readAt: null },
+  { id: 'n3', type: 'follow', actor: { id: 'demo-alex', name: 'Alex Morgan', username: 'alex' }, data: {}, createdAt: new Date(Date.now() - 20 * 3600000).toISOString(), readAt: new Date().toISOString() },
 ];
 const demoProof = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="420"><rect width="300" height="420" fill="#f4f1fb"/><circle cx="150" cy="110" r="38" fill="#2c7a4f"/><path d="M132 110l13 13 24-26" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="150" y="182" font-family="Arial" font-size="19" font-weight="bold" fill="#242331" text-anchor="middle">Payment successful</text><text x="150" y="222" font-family="Arial" font-size="30" font-weight="bold" fill="#242331" text-anchor="middle">Rs 499.00</text><text x="150" y="256" font-family="Arial" font-size="13" fill="#7a7290" text-anchor="middle">To your-upi-id@bank</text><text x="150" y="278" font-family="Arial" font-size="13" fill="#7a7290" text-anchor="middle">UPI Ref 402198337654</text><text x="150" y="380" font-family="Arial" font-size="11" fill="#a09aae" text-anchor="middle">Sample screenshot (preview only)</text></svg>');
-let demoOrders = [{ id: 'demo-order-1', name: 'Sara Iyer', email: 'sara@demo.test', phone: '+91 98765 43210', country: 'India', address: '221B Baker Street, Mumbai 400001', status: 'pending', hasProof: true, proofUrl: demoProof, user: { username: 'sara' }, createdAt: new Date().toISOString() }];
+let demoOrders = [{ id: 'demo-order-1', plan: 'quarterly', name: 'Sara Iyer', email: 'sara@demo.test', phone: '+91 98765 43210', country: 'India', address: '221B Baker Street, Mumbai 400001', status: 'pending', hasProof: true, proofUrl: demoProof, user: { username: 'sara' }, createdAt: new Date().toISOString() }];
 let folders = sampleFolders.map((f, i) => ({ ...f, cards: undefined, id: `folder-${i}`, owner: i === 4 ? collaborators[1] : user, role: i === 4 ? 'viewer' : 'owner', version: 0, members: i === 0 ? [{ user: collaborators[0], role: 'editor' }] : [], memberCount: i === 0 ? 2 : 1, archived: false, cardCount: f.cards.length, createdAt: new Date().toISOString(), updatedAt: new Date(Date.now() - i * 3600000).toISOString() }));
 let cards = sampleFolders.flatMap((f, i) => f.cards.map(([front, back, tags], j) => ({ id: `card-${i}-${j}`, folder: `folder-${i}`, front: { text: front }, back: { text: back }, tags, hint: '', source: '', version: 0, progress: { version: 0, repetitions: 0, interval: 0, bookmarked: false, dueAt: null } })));
 let reviews = [], activity = [], revisions = {}, images = {};
@@ -29,7 +36,11 @@ export async function demoRequest(path, options = {}) {
     return { profile: { ...clone(profile), followers: 0, following: 0, friends: 0, relation: { following: false, friendship: profile.id === user.id ? 'self' : 'none' } }, folders: clone(folders.filter(f => f.owner.id === profile.id && f.visibility === 'global' && !f.archived)) };
   }
   if (path === '/me/friends' || path === '/me/requests') return { people: [] };
-  if (path === '/premium/order') return { order: null };
+  if (entity === 'notifications') {
+    if (id === 'read') { demoNotifications = demoNotifications.map(n => ({ ...n, readAt: n.readAt || new Date().toISOString() })); return { unread: 0 }; }
+    return { notifications: clone(demoNotifications), unread: demoNotifications.filter(n => !n.readAt).length };
+  }
+  if (path === '/premium/order') return { order: null, subscription: { account: user.account, plan: '', planLabel: '', expiresAt: null, daysLeft: null, active: true } };
   if (entity === 'admin') {
     if (id === 'users' && !action) {
       const q = (new URLSearchParams(path.split('?')[1] || '').get('q') || '').toLowerCase();
@@ -37,13 +48,18 @@ export async function demoRequest(path, options = {}) {
     }
     if (id === 'users' && method === 'PATCH') {
       const target = staff.find(u => u.id === action); if (!target) error('User not found.');
-      target.account = body.account; return { user: clone(target) };
+      target.account = body.account;
+      if (body.account !== 'premium') Object.assign(target, { plan: '', planLabel: '', expiresAt: null, daysLeft: null });
+      return { user: clone(target) };
     }
     if (id === 'orders' && !action) return { orders: clone(demoOrders) };
     if (id === 'orders' && method === 'PATCH') {
       const order = demoOrders.find(o => o.id === action); if (!order) error('No pending order.');
       order.status = body.status;
-      if (body.status === 'approved') { const u = staff.find(s => s.username === order.user.username); if (u) u.account = 'premium'; }
+      if (body.status === 'approved') {
+        const u = staff.find(s => s.username === order.user.username), plan = planById(order.plan);
+        if (u) Object.assign(u, { account: 'premium', plan: order.plan, planLabel: plan?.label || '', expiresAt: plan?.days ? inDays(plan.days) : null, daysLeft: plan?.days ?? null });
+      }
       return { order: clone(order) };
     }
     return { ok: true };

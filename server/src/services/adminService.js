@@ -1,8 +1,14 @@
 import { User, PremiumOrder } from '../models/index.js';
-import { canAssign, ACCOUNTS } from '../../../shared/account.js';
+import { canAssign, ACCOUNTS, planById, premiumDaysLeft, premiumExpiryAfter, hasPremium } from '../../../shared/account.js';
+import { notify } from './notificationService.js';
 import { assert } from '../utils/errors.js';
 
-const publicAdmin = u => ({ id: u.id, username: u.username, name: u.name, email: u.email, account: u.account || 'normal', createdAt: u.createdAt });
+const publicAdmin = u => ({
+  id: u.id, username: u.username, name: u.name, email: u.email,
+  account: u.account || 'normal', createdAt: u.createdAt,
+  plan: u.premiumPlan || '', planLabel: planById(u.premiumPlan)?.label || '',
+  expiresAt: u.premiumExpiresAt || null, daysLeft: premiumDaysLeft(u), premiumActive: hasPremium(u),
+});
 
 export async function listUsers(q) {
   const filter = {};
@@ -10,7 +16,7 @@ export async function listUsers(q) {
     const rx = new RegExp(String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     filter.$or = [{ username: rx }, { name: rx }, { email: rx }];
   }
-  const users = await User.find(filter).select('+email name username account createdAt').sort({ createdAt: -1 }).limit(100);
+  const users = await User.find(filter).select('+email name username account premiumPlan premiumExpiresAt createdAt').sort({ createdAt: -1 }).limit(100);
   return users.map(publicAdmin);
 }
 
@@ -23,7 +29,9 @@ export async function setAccount(actor, userId, account) {
     const left = await User.countDocuments({ account: 'superadmin', _id: { $ne: target.id } });
     assert(left >= 1, 400, 'Keep at least one Superadmin.');
   }
+  // A role granted by hand carries no end date; moving someone off Premium clears the subscription.
   target.account = account;
+  if (account !== 'premium') { target.premiumPlan = ''; target.premiumExpiresAt = null; }
   await target.save();
   return publicAdmin(target);
 }
@@ -41,9 +49,17 @@ export async function decideOrder(actor, orderId, status) {
   order.status = status;
   order.reviewedBy = actor.id;
   await order.save();
+  let expiresAt = null;
   if (status === 'approved') {
     const user = await User.findById(order.user);
-    if (user && (user.account || 'normal') === 'normal') { user.account = 'premium'; await user.save(); }
+    if (user) {
+      expiresAt = premiumExpiryAfter(user, planById(order.plan));
+      if ((user.account || 'normal') === 'normal') user.account = 'premium';
+      user.premiumPlan = order.plan;
+      user.premiumExpiresAt = expiresAt;
+      await user.save();
+    }
   }
+  await notify(order.user, status === 'approved' ? 'premium.approved' : 'premium.declined', { actor, data: { plan: order.plan, expiresAt } });
   return order;
 }
