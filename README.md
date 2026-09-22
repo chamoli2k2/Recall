@@ -128,6 +128,16 @@ Both routes converge on `fulfilOrder`, the only code that applies a plan. It fli
 
 The gateway is spoken to over plain `fetch` rather than its SDK, so the trust boundary is small enough to read: an order is reserved server-side, the browser pays in Razorpay's own window, and nothing is granted until an HMAC-SHA256 signature verifies under `crypto.timingSafeEqual`. The webhook is the authoritative path, since a buyer who closes the tab after paying never sends the callback. Its route is mounted on `express.raw()` **before** the JSON parser, because the signature covers the exact bytes the gateway sent and a re-serialised body will not match — `server/test/payments.test.js` asserts exactly that.
 
+### Classrooms and teams
+
+A team is a roster with paid seats. Plans are per seat (`shared/teams.js`), so the price follows the size of the group rather than a tier it has to grow into, and the owner can add seats later. A classroom and a study team are the same entity; `kind` only decides whether the roles read as teacher/student or manager/member.
+
+Taking a seat is one transaction. The membership row and the `memberCount` that guards the cap are written together, and the counter is only incremented while it is still below the paid seat count, so two students racing for the last chair cannot both get in — `server/test/integration.test.js` opens two simultaneous joins against a team with one seat free and asserts exactly one wins. Removing someone frees their seat immediately, so nobody is billed for an empty chair.
+
+A seat unlocks the Premium toolkit **inside the team's own folders and nowhere else**. That is why the folder-scoped gates moved off the routes and into the folder layer: whether import, export, covers, editor invites, or quiz hosting are allowed depends on which folder is open, not on who is asking. `entitledOnFolder` is the one question they all ask, and the folder payload carries its answer as `premium` so the menu and the server agree. A student's personal library is unchanged by joining or leaving a class, and a lapsed team closes its own folders without anyone revoking anything.
+
+Seats are sold through the order pipeline built for personal plans, which is why neither payment method needed new code: `team` on the order means the payment buys seats, and `fulfilOrder` applies it to the team instead of the user. Prices are quoted server-side from the team's own state, because proration depends on how much of the term is left.
+
 ### Security
 
 | Threat | Control |

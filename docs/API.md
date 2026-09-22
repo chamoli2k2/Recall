@@ -52,6 +52,21 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | POST | `/premium/webhook/razorpay` | Gateway callback, unauthenticated but signed. Mounted on the **raw** body before the JSON parser, because `X-Razorpay-Signature` covers the exact bytes. Handles `payment.captured` and `payment.failed`. Safe to retry: the grant is a conditional status update, so a replay returns `alreadySettled` and adds no days |
 | DELETE | `/premium/order` | Discards the caller's pending order, e.g. after they close the checkout window |
 | GET | `/premium/orders/:id/proof` | Owner or admin; payment screenshot. Manual orders only. `Cache-Control: private, no-store` |
+| GET / POST | `/teams` | Own teams with `role`, `seats`, `memberCount`, `daysLeft`, `active`. POST takes `{ name, kind: classroom\|team, description }` and creates it unpaid with no seats |
+| GET | `/teams/:id` | `{ team, members, folders, assignments }`. Only for members; a team you are not in is a 404 |
+| PATCH / PATCH | `/teams/:id`, `/teams/:id/archive` | Owner only. Update takes `version` for optimistic concurrency; archiving keeps the folders and study history |
+| GET | `/teams/code/:code` | What a join code leads to — team name, kind, and the role it grants. Nothing else is revealed before the seat is taken |
+| POST | `/teams/join` | `{ code }`. Takes a seat in one transaction; 400 `NO_SEATS` when the team is full, `TEAM_INACTIVE` when unpaid, `ALREADY_MEMBER` when already in |
+| GET / POST | `/teams/:id/invites` | Teacher or owner. POST returns the plaintext `code` **once**; only a SHA-256 hash is stored. Optional `role`, `maxUses`, `expiresInDays` |
+| DELETE | `/teams/:id/invites/:inviteId` | Revoke an unused link |
+| PATCH / DELETE | `/teams/:id/members/:userId` | Owner sets `role` (teacher\|student). Removing frees the seat at once; a member may remove themselves, but the owner cannot leave |
+| POST | `/teams/:id/folders` | Teacher or owner; creates a folder the team owns, readable by the whole roster |
+| POST / DELETE | `/teams/:id/assignments` | `{ folderId, title?, instructions?, dueAt? }`. Everyone else on the roster gets a `team.assignment` notification |
+| GET | `/teams/:id/progress` | Teacher or owner; optional `?folderId=`. Per-person coverage, reviews, accuracy, cards due, and last studied, read from each learner's own progress |
+| POST | `/teams/:id/quote` | `{ plan: team-monthly\|team-yearly, seats }`. Prices from the team's own state: `team-new` pays for every seat, `team-renew` extends the current count, `team-seats` prorates extras against the days left |
+| GET | `/teams/:id/billing` | The owner's pending seat order, if any, plus the usable payment `methods` |
+| POST | `/teams/:id/checkout` | Gateway flow for seats. Same shape as `/premium/checkout` plus `seats`; confirm through `/premium/checkout/confirm` |
+| POST / DELETE | `/teams/:id/order` | Manual flow for seats (multipart with `proof`), and discarding a pending seat order |
 | GET | `/admin/users` | Admin/Superadmin; list accounts (`+email`) with `plan`, `expiresAt`, `daysLeft`, `premiumActive`. `?q=` filters |
 | PATCH | `/admin/users/:id` | `{ account: normal\|premium\|admin\|superadmin }`. Admin may only set normal/premium. A hand-granted role carries no end date; moving off premium clears the subscription |
 | GET | `/admin/orders` | Premium payment requests, including the requested `plan` and `method`. `hasProof` is only true for manual orders |

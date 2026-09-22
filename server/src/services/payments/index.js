@@ -12,7 +12,8 @@ export const METHODS = [
   {
     id: 'razorpay',
     label: 'Pay online',
-    blurb: 'UPI, card, net banking, or wallet. Premium turns on the moment the payment clears.',
+    // Product-neutral, because this same picker sells a personal plan and a pack of team seats.
+    blurb: 'UPI, card, net banking, or wallet. It turns on the moment the payment clears.',
     instant: true,
     requiresProof: false,
     isConfigured: razorpay.isConfigured,

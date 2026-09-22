@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
-import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, Menu as MenuIcon, Search, Archive, LogOut, Layers, Swords, FolderOpen, UserPlus, LayoutDashboard, Crown } from 'lucide-react';
+import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, Menu as MenuIcon, Search, Archive, LogOut, Layers, Swords, FolderOpen, UserPlus, LayoutDashboard, Crown, GraduationCap } from 'lucide-react';
 import { Avatar, Button, Modal } from './ui';
 import { useApp, useLoad } from '../hooks/useApp';
 import { api } from '../services/api';
@@ -44,7 +44,7 @@ export default function Layout() {
   const [create, setCreate] = useState(false), [mobile, setMobile] = useState(false), [help, setHelp] = useState(false), [query, setQuery] = useState(''), [people, setPeople] = useState([]);
   const { data } = useLoad(() => api('/folders'), [revision]);
   const sidebar = useSidebarWidth();
-  const nav = [['/', LibraryBig, 'My library', false], ['/projects', FolderOpen, 'Projects', true], ['/friends', UserPlus, 'Friends', false], ['/shared', Users, 'Shared with me', false], ['/explore', Compass, 'Explore', false], ['/progress', ChartNoAxesCombined, 'My progress', false], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz', true]]), ...(hasDashboard(user) ? [['/dashboard', LayoutDashboard, 'Dashboard', false]] : [])];
+  const nav = [['/', LibraryBig, 'My library', false], ['/projects', FolderOpen, 'Projects', true], ['/teams', GraduationCap, 'Classrooms', false], ['/friends', UserPlus, 'Friends', false], ['/shared', Users, 'Shared with me', false], ['/explore', Compass, 'Explore', false], ['/progress', ChartNoAxesCombined, 'My progress', false], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz', true]]), ...(hasDashboard(user) ? [['/dashboard', LayoutDashboard, 'Dashboard', false]] : [])];
   async function signOut() {
     try { if (!isDemo) await api('/auth/logout', { method: 'POST' }); setUser(null); setMobile(false); navigate('/'); }
     catch (e) { reportError(e); }

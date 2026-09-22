@@ -1,6 +1,7 @@
 import { uuid } from './uuid';
 import { sampleFolders } from '../../../shared/sampleData';
 import { planById } from '../../../shared/account.js';
+import { teamPlanById, clampSeats, seatTopUpPrice } from '../../../shared/teams.js';
 const user = { id: 'demo-user', username: 'gaurav', name: 'Gaurav Prakash', bio: 'Learning something new, one card at a time.', dailyGoal: 20, savedFolders: [], account: 'superadmin' };
 const collaborators = [{ id: 'demo-alex', name: 'Alex Morgan', username: 'alex' }, { id: 'demo-maya', name: 'Maya Chen', username: 'maya' }];
 // Stand-in roster so the dashboard has something to manage in the preview.
@@ -22,7 +23,7 @@ let demoNotifications = [
 const demoProof = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="420"><rect width="300" height="420" fill="#f4f1fb"/><circle cx="150" cy="110" r="38" fill="#2c7a4f"/><path d="M132 110l13 13 24-26" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="150" y="182" font-family="Arial" font-size="19" font-weight="bold" fill="#242331" text-anchor="middle">Payment successful</text><text x="150" y="222" font-family="Arial" font-size="30" font-weight="bold" fill="#242331" text-anchor="middle">Rs 499.00</text><text x="150" y="256" font-family="Arial" font-size="13" fill="#7a7290" text-anchor="middle">To your-upi-id@bank</text><text x="150" y="278" font-family="Arial" font-size="13" fill="#7a7290" text-anchor="middle">UPI Ref 402198337654</text><text x="150" y="380" font-family="Arial" font-size="11" fill="#a09aae" text-anchor="middle">Sample screenshot (preview only)</text></svg>');
 // The preview shows both methods so the picker is visible, but neither can actually take money.
 const demoMethods = [
-  { id: 'razorpay', label: 'Pay online', blurb: 'UPI, card, net banking, or wallet. Premium turns on the moment the payment clears.', instant: true, requiresProof: false },
+  { id: 'razorpay', label: 'Pay online', blurb: 'UPI, card, net banking, or wallet. It turns on the moment the payment clears.', instant: true, requiresProof: false },
   { id: 'manual', label: 'Pay by UPI transfer', blurb: 'Send the amount to our UPI ID and upload the screenshot. An admin confirms it, usually within a day.', instant: false, requiresProof: true },
 ];
 let demoOrders = [{ id: 'demo-order-1', plan: 'quarterly', method: 'manual', name: 'Sara Iyer', email: 'sara@demo.test', phone: '+91 98765 43210', country: 'India', address: '221B Baker Street, Mumbai 400001', status: 'pending', hasProof: true, proofUrl: demoProof, user: { username: 'sara' }, createdAt: new Date().toISOString() }];
@@ -31,6 +32,72 @@ let cards = sampleFolders.flatMap((f, i) => f.cards.map(([front, back, tags], j)
 let reviews = [], activity = [], revisions = {}, images = {};
 const clone = x => structuredClone(x);
 const error = message => { throw new Error(message); };
+// A paid-up classroom so the preview can show a roster, assignments, and the teacher's report.
+let demoTeamRows = [{
+  id: 'demo-team-1', name: 'Physics 101', kind: 'classroom', description: 'Year one mechanics',
+  plan: 'team-yearly', planLabel: 'Yearly', seats: 12, memberCount: 5, seatsLeft: 7,
+  expiresAt: inDays(233), daysLeft: 233, active: true, version: 0, createdAt: inDays(-40),
+  role: 'owner', roleLabel: 'Teacher (owner)',
+}];
+const demoRoster = [
+  { id: user.id, name: user.name, username: user.username, role: 'owner', roleLabel: 'Teacher (owner)', joinedAt: inDays(-40) },
+  { id: 'demo-maya', name: 'Maya Chen', username: 'maya', role: 'teacher', roleLabel: 'Teacher', joinedAt: inDays(-38) },
+  { id: 'demo-alex', name: 'Alex Morgan', username: 'alex', role: 'student', roleLabel: 'Student', joinedAt: inDays(-31) },
+  { id: 'demo-ada', name: 'Ada Lovelace', username: 'ada', role: 'student', roleLabel: 'Student', joinedAt: inDays(-30) },
+  { id: 'demo-linus', name: 'Linus Berg', username: 'linus', role: 'student', roleLabel: 'Student', joinedAt: inDays(-12) },
+];
+let demoAssignments = [{ id: 'demo-assign-1', title: 'Newton’s laws', instructions: 'Finish the folder before Friday and flag anything unclear.', dueAt: inDays(4), folder: { id: 'folder-0', title: 'System design', color: 'violet', icon: 'layers' }, createdAt: inDays(-2) }];
+let demoInvites = [];
+// Coverage is a share of whatever is in scope, so the sample is a ratio rather than a card count.
+const demoProgressRows = [
+  { seen: 1, reviews: 44, accuracy: 86, due: 2, lastReviewedAt: inDays(0) },
+  { seen: 0.82, reviews: 31, accuracy: 74, due: 5, lastReviewedAt: inDays(-1) },
+  { seen: 1, reviews: 52, accuracy: 91, due: 0, lastReviewedAt: inDays(0) },
+  { seen: 0.45, reviews: 16, accuracy: 61, due: 9, lastReviewedAt: inDays(-4) },
+  { seen: 0, reviews: 0, accuracy: null, due: 0, lastReviewedAt: null },
+];
+function demoTeams(path, method, body, id, action, parts) {
+  const team = demoTeamRows[0];
+  const folders18 = folders.filter(f => f.role === 'owner').slice(0, 2).map(f => ({ id: f.id, title: f.title, color: f.color, icon: f.icon, cardCount: f.cardCount, updatedAt: f.updatedAt }));
+  if (!id && method === 'GET') return { teams: clone(demoTeamRows) };
+  if (!id && method === 'POST') error('Creating a team needs a signed-in account outside the preview.');
+  if (id === 'join') error('Joining a team needs a signed-in account outside the preview.');
+  if (id === 'code') error('That code does not match an open invite.');
+  if (!action && method === 'GET') return { team: clone(team), members: clone(demoRoster), folders: clone(folders18), assignments: clone(demoAssignments) };
+  if (action === 'progress') {
+    const total = folders18.reduce((n, f) => n + f.cardCount, 0);
+    return { team: clone(team), folders: folders18.map(f => ({ id: f.id, title: f.title })), totalCards: total, rows: demoRoster.map((m, i) => {
+      const { seen, ...rest } = demoProgressRows[i];
+      const studied = Math.round(seen * total);
+      return { ...m, ...rest, studied, coverage: total ? Math.round((studied / total) * 100) : 0, lapses: 0 };
+    }) };
+  }
+  if (action === 'invites' && method === 'GET') return { invites: clone(demoInvites) };
+  if (action === 'invites' && method === 'POST') {
+    const invite = { id: uuid(), role: body.role || 'student', roleLabel: body.role === 'teacher' ? 'Teacher' : 'Student', uses: 0, maxUses: 0, expiresAt: null, createdAt: new Date().toISOString() };
+    demoInvites = [invite, ...demoInvites];
+    return { invite, code: 'PREVIEW7' };
+  }
+  if (action === 'invites' && method === 'DELETE') { demoInvites = demoInvites.filter(i => i.id !== parts[3]); return { revoked: true }; }
+  if (action === 'quote') {
+    const plan = teamPlanById(body.plan), seats = clampSeats(body.seats);
+    const kind = seats > team.seats ? 'team-seats' : 'team-renew';
+    const amount = kind === 'team-seats' ? seatTopUpPrice(plan, seats - team.seats, team.expiresAt) : plan.perSeat * team.seats;
+    return { kind, seats: kind === 'team-seats' ? seats : team.seats, plan: plan.id, planLabel: plan.label, perSeat: plan.perSeat, amount, currency: 'INR', seatsNow: team.seats, expiresAt: team.expiresAt };
+  }
+  if (action === 'billing') return { order: null, subscription: null, methods: clone(demoMethods) };
+  if (action === 'assignments' && method === 'POST') {
+    const folder = folders18.find(f => f.id === body.folderId) || folders18[0];
+    const assignment = { id: uuid(), title: body.title || folder.title, instructions: body.instructions || '', dueAt: body.dueAt || null, folder, createdAt: new Date().toISOString() };
+    demoAssignments = [assignment, ...demoAssignments];
+    return { assignment };
+  }
+  if (action === 'assignments' && method === 'DELETE') { demoAssignments = demoAssignments.filter(a => a.id !== parts[3]); return { archived: true }; }
+  if (action === 'members' && method === 'PATCH') return { role: body.role };
+  if (action === 'members' && method === 'DELETE') error('Changing the roster needs a signed-in account outside the preview.');
+  if (action === 'folders' || action === 'checkout' || action === 'order') error('This needs a signed-in account outside the preview.');
+  return { ok: true };
+}
 export async function demoRequest(path, options = {}) {
   const method = options.method || 'GET'; const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body || {};
   const parts = path.split('?')[0].split('/').filter(Boolean); const [entity, id, action] = parts;
@@ -41,6 +108,7 @@ export async function demoRequest(path, options = {}) {
     return { profile: { ...clone(profile), followers: 0, following: 0, friends: 0, relation: { following: false, friendship: profile.id === user.id ? 'self' : 'none' } }, folders: clone(folders.filter(f => f.owner.id === profile.id && f.visibility === 'global' && !f.archived)) };
   }
   if (path === '/me/friends' || path === '/me/requests') return { people: [] };
+  if (entity === 'teams') return demoTeams(path, method, body, id, action, parts);
   if (entity === 'notifications') {
     if (id === 'read') { demoNotifications = demoNotifications.map(n => ({ ...n, readAt: n.readAt || new Date().toISOString() })); return { unread: 0 }; }
     return { notifications: clone(demoNotifications), unread: demoNotifications.filter(n => !n.readAt).length };
@@ -85,7 +153,8 @@ export async function demoRequest(path, options = {}) {
     const folder = folders.find(f => f.id === id); if (!folder) error('Folder not found.');
     if (action === 'cards' && method === 'GET') return { cards: clone(cards.filter(c => c.folder === id)) };
     if (action === 'activity') return { activity: clone(activity.filter(a => a.folder === id)) };
-    if (!action && method === 'GET') return { folder: clone(folder) };
+    // The server answers entitlement per folder; the preview account has the toolkit everywhere.
+    if (!action && method === 'GET') return { folder: { ...clone(folder), premium: true } };
     if (action === 'save') { folder.saved = body.saved; return { ok: true }; }
     if (action === 'copy') { const copy = { ...clone(folder), id: uuid(), title: `${folder.title} (copy)`, owner: clone(user), role: 'owner', members: [], visibility: 'private', version: 0, originalCreator: folder.owner.username }; folders.unshift(copy); cards.push(...cards.filter(c => c.folder === id).map(c => ({ ...clone(c), id: uuid(), folder: copy.id, progress: { version: 0, interval: 0, repetitions: 0, bookmarked: false } }))); return { folder: clone(copy) }; }
     if (folder.role !== 'owner' && folder.role !== 'editor') error('This folder is read-only. Make a copy to edit it.');
