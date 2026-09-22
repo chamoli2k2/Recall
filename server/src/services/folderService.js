@@ -1,5 +1,6 @@
 import { Folder, Card, User, Media, Revision } from '../models/index.js';
 import { accessFolder, mutateFolder, recordEvent, roleOf } from './accessService.js';
+import { hasPremium } from '../../../shared/account.js';
 import { assert } from '../utils/errors.js';
 const populate = [{ path: 'owner', select: 'name username' }, { path: 'members.user', select: 'name username' }];
 export async function presentFolder(folder, user) {
@@ -21,7 +22,10 @@ export async function createFolder(user, body) { const { thumbnail, ...rest } = 
 export async function updateFolder(id, user, body) {
   return mutateFolder(id, user, 'owner', async (folder, session) => {
     assert(folder.version === body.version, 409, 'This folder changed. Refresh and try again.', 'VERSION_CONFLICT');
-    if (body.thumbnail) assert(await Media.exists({ _id: body.thumbnail, folder: folder.id }).session(session), 400, 'Thumbnail does not belong to this folder.');
+    if (body.thumbnail) {
+      assert(hasPremium(user), 402, 'Folder covers are a Premium feature.', 'PREMIUM_REQUIRED');
+      assert(await Media.exists({ _id: body.thumbnail, folder: folder.id }).session(session), 400, 'Thumbnail does not belong to this folder.');
+    }
     const { version, ...changes } = body; Object.assign(folder, changes); folder.version += 1;
     await folder.save({ session }); await recordEvent(folder, user, 'folder.updated', folder.title, session); return folder;
   });
@@ -31,6 +35,7 @@ export async function setMember(id, user, username, role) {
     const target = await User.findOne({ username }).session(session); assert(target, 404, 'No user with that username. Ask them to create an account first.');
     assert(target.id !== String(folder.owner), 400, 'The owner already has full access.');
     folder.members = folder.members.filter(m => String(m.user) !== target.id);
+    if (role === 'editor') assert(hasPremium(user), 402, 'Inviting editors is a Premium feature.', 'PREMIUM_REQUIRED');
     if (role !== 'remove') folder.members.push({ user: target.id, role });
     folder.version += 1; await folder.save({ session }); await recordEvent(folder, user, 'folder.members.changed', role === 'remove' ? `Removed @${username}` : `Added @${username} as ${role}`, session); return folder;
   });

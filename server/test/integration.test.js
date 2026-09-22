@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { connectDatabase } from '../src/config/database.js';
 import { createApp } from '../src/app.js';
-import { allModels, Review } from '../src/models/index.js';
+import { allModels, Review, User } from '../src/models/index.js';
 const enabled = process.env.RUN_INTEGRATION === '1';
 let mongo, app, owner, editor, outsider, folderId, cardId;
 const password = 'Integration-only-password-2026';
@@ -19,6 +19,7 @@ before(async () => {
   await Promise.all(allModels.map(m => m.init())); app = createApp();
   [owner, editor, outsider] = [request.agent(app), request.agent(app), request.agent(app)];
   for (const [agent, username] of [[owner, 'owner'], [editor, 'editor'], [outsider, 'outsider']]) { const r = await agent.post('/api/auth/signup').send({ username, name: username, email: `${username}@example.test`, password }); assert.equal(r.status, 201, JSON.stringify(r.body)); }
+  await User.updateMany({}, { $set: { account: 'premium' } });
   const f = await owner.post('/api/folders').send({ title: 'Concurrency', visibility: 'private' }); assert.equal(f.status, 201); folderId = f.body.folder.id;
   const c = await owner.post(`/api/folders/${folderId}/cards`).send({ front: { text: 'Q' }, back: { text: 'A' } }); assert.equal(c.status, 201); cardId = c.body.card.id;
 });
@@ -98,5 +99,26 @@ integration('follow is one-way, connect needs accept, like and copy counts stay 
   assert.equal((await editor.post(`/api/projects/${project.body.project.id}/folders`).send({ folderId: copied.body.folder.id })).status, 200);
   const people = await owner.get('/api/users?q=edit');
   assert.equal(people.status, 200); assert.ok(people.body.users.some(u => u.username === 'editor'));
+});
+integration('dashboard is staff-only; premium routes reject a normal account', async () => {
+  await User.updateOne({ username: 'owner' }, { $set: { account: 'superadmin' } });
+  await User.updateOne({ username: 'outsider' }, { $set: { account: 'normal' } });
+  assert.equal((await outsider.get('/api/admin/users')).status, 403);
+  const staff = await owner.get('/api/admin/users');
+  assert.equal(staff.status, 200); assert.ok(staff.body.users.length >= 3);
+  const outsiderId = staff.body.users.find(u => u.username === 'outsider').id;
+  assert.equal((await owner.patch(`/api/admin/users/${outsiderId}`).send({ account: 'premium' })).status, 200);
+  assert.equal((await outsider.get('/api/projects')).status, 200);
+  await owner.patch(`/api/admin/users/${outsiderId}`).send({ account: 'normal' });
+  assert.equal((await outsider.get('/api/projects')).status, 402);
+  const png = await sharp({ create: { width: 16, height: 16, channels: 3, background: '#22aa66' } }).png().toBuffer();
+  const buy = await outsider.post('/api/premium/order').field('name', 'Out Sider').field('email', 'out@example.test').field('phone', '9999999999').field('country', 'India').field('address', '1 Demo Street').attach('proof', png, 'upi.png');
+  assert.equal(buy.status, 201, JSON.stringify(buy.body));
+  assert.equal((await outsider.get(`/api/premium/orders/${buy.body.order.id}/proof`)).status, 200);
+  assert.equal((await outsider.post('/api/premium/order').send({ name: 'No Photo', email: 'a@b.co', phone: '9999999999', country: 'India', address: '1 Demo Street' })).status, 400);
+  const orders = await owner.get('/api/admin/orders');
+  assert.equal(orders.status, 200);
+  assert.equal((await owner.patch(`/api/admin/orders/${orders.body.orders[0].id}`).send({ status: 'approved' })).status, 200);
+  assert.equal((await outsider.get('/api/projects')).status, 200);
 });
 

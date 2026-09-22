@@ -47,6 +47,7 @@ if (!user) {
     email: creds.email,
     bio: 'Public demo collections you can browse without signing in.',
     passwordHash,
+    account: 'superadmin',
   });
   console.log(`Demo account created: @${creds.username}`);
 } else {
@@ -54,6 +55,7 @@ if (!user) {
   user.email = creds.email;
   user.bio = user.bio || 'Public demo collections you can browse without signing in.';
   user.passwordHash = passwordHash;
+  user.account = 'superadmin';
   await user.save();
   console.log(`Demo account updated: @${creds.username}`);
 }

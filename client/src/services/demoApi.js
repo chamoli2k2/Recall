@@ -1,6 +1,6 @@
 import { uuid } from './uuid';
 import { sampleFolders } from '../../../shared/sampleData';
-const user = { id: 'demo-user', username: 'gaurav', name: 'Gaurav Prakash', bio: 'Learning something new, one card at a time.', dailyGoal: 20, savedFolders: [] };
+const user = { id: 'demo-user', username: 'gaurav', name: 'Gaurav Prakash', bio: 'Learning something new, one card at a time.', dailyGoal: 20, savedFolders: [], account: 'superadmin' };
 const collaborators = [{ id: 'demo-alex', name: 'Alex Morgan', username: 'alex' }, { id: 'demo-maya', name: 'Maya Chen', username: 'maya' }];
 let folders = sampleFolders.map((f, i) => ({ ...f, cards: undefined, id: `folder-${i}`, owner: i === 4 ? collaborators[1] : user, role: i === 4 ? 'viewer' : 'owner', version: 0, members: i === 0 ? [{ user: collaborators[0], role: 'editor' }] : [], memberCount: i === 0 ? 2 : 1, archived: false, cardCount: f.cards.length, createdAt: new Date().toISOString(), updatedAt: new Date(Date.now() - i * 3600000).toISOString() }));
 let cards = sampleFolders.flatMap((f, i) => f.cards.map(([front, back, tags], j) => ({ id: `card-${i}-${j}`, folder: `folder-${i}`, front: { text: front }, back: { text: back }, tags, hint: '', source: '', version: 0, progress: { version: 0, repetitions: 0, interval: 0, bookmarked: false, dueAt: null } })));
@@ -17,6 +17,12 @@ export async function demoRequest(path, options = {}) {
     return { profile: { ...clone(profile), followers: 0, following: 0, friends: 0, relation: { following: false, friendship: profile.id === user.id ? 'self' : 'none' } }, folders: clone(folders.filter(f => f.owner.id === profile.id && f.visibility === 'global' && !f.archived)) };
   }
   if (path === '/me/friends' || path === '/me/requests') return { people: [] };
+  if (path === '/premium/order') return { order: null };
+  if (entity === 'admin') {
+    if (id === 'users' && !action) return { users: [clone(user), ...collaborators.map(c => ({ ...c, email: `${c.username}@demo.test`, account: 'normal' }))] };
+    if (id === 'orders') return { orders: [] };
+    return { ok: true };
+  }
   if (entity === 'projects') {
     if (!id && method === 'GET') return { projects: [] };
     if (!id && method === 'POST') return { project: { id: uuid(), title: body.title, description: body.description || '', visibility: body.visibility || 'private', folders: [], folderCount: 0, version: 0, role: 'owner' } };

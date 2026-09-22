@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
-import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, Menu as MenuIcon, Search, Archive, LogOut, Layers, Swords, FolderOpen, UserPlus } from 'lucide-react';
+import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, Menu as MenuIcon, Search, Archive, LogOut, Layers, Swords, FolderOpen, UserPlus, LayoutDashboard, Crown } from 'lucide-react';
 import { Avatar, Button, Modal } from './ui';
 import { useApp, useLoad } from '../hooks/useApp';
 import { api } from '../services/api';
 import FolderModal from './FolderModal';
 import ThemeToggle from './ThemeToggle';
 import SiteFooter from './SiteFooter';
+import { PremiumMark } from './PremiumMark';
+import { hasDashboard, hasPremium } from '../../../shared/account.js';
 import { toast } from 'sonner';
 export default function Layout() {
   const { user, isDemo, revision, setUser } = useApp(); const navigate = useNavigate();
   const [create, setCreate] = useState(false), [mobile, setMobile] = useState(false), [help, setHelp] = useState(false), [query, setQuery] = useState(''), [people, setPeople] = useState([]);
   const { data } = useLoad(() => api('/folders'), [revision]);
-  const nav = [['/', LibraryBig, 'My library'], ['/projects', FolderOpen, 'Projects'], ['/friends', UserPlus, 'Friends'], ['/shared', Users, 'Shared with me'], ['/explore', Compass, 'Explore'], ['/progress', ChartNoAxesCombined, 'My progress'], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz']])];
+  const nav = [['/', LibraryBig, 'My library', false], ['/projects', FolderOpen, 'Projects', true], ['/friends', UserPlus, 'Friends', false], ['/shared', Users, 'Shared with me', false], ['/explore', Compass, 'Explore', false], ['/progress', ChartNoAxesCombined, 'My progress', false], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz', true]]), ...(hasDashboard(user) ? [['/dashboard', LayoutDashboard, 'Dashboard', false]] : [])];
   async function onSearch(value) {
     setQuery(value);
     if (value.trim().length < 2) { setPeople([]); return; }
@@ -24,10 +26,10 @@ export default function Layout() {
       <Link className="brand" to="/" onClick={() => setMobile(false)}><img src="/favicon.svg" alt=""/>recall<span className="brand-period">.</span></Link>
       <Button className="primary sidebar-create" onClick={() => setCreate(true)}><Plus size={19}/> Create a folder</Button>
       <div className="nav-caption">WORKSPACE</div>
-      <nav>{nav.map(([to, Icon, title]) => <NavLink key={to} to={to} end onClick={() => setMobile(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><Icon size={19}/><span>{title}</span>{to === '/' && <span className="nav-count">{data?.folders?.length || 0}</span>}</NavLink>)}</nav>
+      <nav>{nav.map(([to, Icon, title, premium]) => <NavLink key={to} to={to} end onClick={() => setMobile(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><Icon size={19}/><span>{title}</span>{premium && <PremiumMark/>}{to === '/' && <span className="nav-count">{data?.folders?.length || 0}</span>}</NavLink>)}</nav>
       <div className="nav-caption folder-caption">YOUR FOLDERS <button className="icon-button" aria-label="Create another folder" onClick={() => setCreate(true)}><Plus size={15}/></button></div>
       <div className="sidebar-folders">{data?.folders?.filter(f => f.role === 'owner').slice(0, 5).map(f => <NavLink key={f.id} to={`/folders/${f.id}`} onClick={() => setMobile(false)} className="folder-link"><span className={`folder-dot ${f.color}`}/><span>{f.title}</span></NavLink>)}</div>
-      <div className="sidebar-bottom"><button className="small-tip" onClick={() => setHelp(true)}><span className="tip-icon"><Layers size={20}/></span><strong>A little learning, every day.</strong><span>Your future self will thank you.</span><span className="tip-link">Make it a habit <ArrowUpRight size={14}/></span></button><NavLink to="/archive" className="nav-link"><Archive size={18}/> Archived folders</NavLink><NavLink to="/settings" className="nav-link"><Settings2 size={18}/> Settings</NavLink><div className="account"><Avatar user={user}/><div><strong>{user?.name || 'Guest'}</strong><span>@{user?.username || 'guest'}</span></div>{!isDemo && <button aria-label="Sign out" className="icon-button" onClick={async () => { try { await api('/auth/logout', { method: 'POST' }); setUser(null); navigate('/'); } catch (e) { toast.error(e.message); } }}><LogOut size={17}/></button>}</div></div>
+      <div className="sidebar-bottom"><button className="small-tip" onClick={() => setHelp(true)}><span className="tip-icon"><Layers size={20}/></span><strong>A little learning, every day.</strong><span>Your future self will thank you.</span><span className="tip-link">Make it a habit <ArrowUpRight size={14}/></span></button><NavLink to="/archive" className="nav-link"><Archive size={18}/> Archived folders</NavLink><NavLink to="/premium" className="nav-link"><Crown size={18}/> {hasPremium(user) ? 'Premium' : 'Buy Premium'}</NavLink><NavLink to="/settings" className="nav-link"><Settings2 size={18}/> Settings</NavLink><div className="account"><Avatar user={user}/><div><strong>{user?.name || 'Guest'}</strong><span>@{user?.username || 'guest'}</span></div>{!isDemo && <button aria-label="Sign out" className="icon-button" onClick={async () => { try { await api('/auth/logout', { method: 'POST' }); setUser(null); navigate('/'); } catch (e) { toast.error(e.message); } }}><LogOut size={17}/></button>}</div></div>
     </aside>
     <div className="workspace"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-toggle" aria-label="Open navigation" onClick={() => setMobile(true)}><MenuIcon size={20}/></button><strong>Library</strong></div><form className="global-search" onSubmit={e => { e.preventDefault(); if (people[0]) navigate(`/u/${people[0].username}`); else navigate(`/?q=${encodeURIComponent(query)}`); }}><Search size={16}/><input aria-label="Search folders and people" placeholder="Folders or people…" value={query} onChange={e => onSearch(e.target.value)}/>{people.length > 0 && <div className="search-people">{people.map(p => <Link key={p.id} to={`/u/${p.username}`} onClick={() => { setQuery(''); setPeople([]); }}><Avatar user={p} small/><span>{p.name} <small>@{p.username}</small></span></Link>)}</div>}</form><ThemeToggle/><Link to={`/u/${user?.username || ''}`} aria-label="Your profile"><Avatar user={user} small/></Link></header>
       {isDemo && <div className="demo-banner"><span className="demo-pill">INTERACTIVE PREVIEW</span><span>Try the sample workspace. Changes reset on refresh; accounts and live sharing require the backend.</span></div>}

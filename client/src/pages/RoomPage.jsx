@@ -13,7 +13,7 @@ export function JoinRoomPage() {
   const [code, setCode] = useState(''); const navigate = useNavigate();
   return <div className="room-join"><span className="room-icon"><Swords size={26}/></span><span className="eyebrow">LIVE QUIZ</span><h1>Join a study room</h1><p>Someone hosting a quiz will give you a six-letter code. Enter it below to jump in. Answer fast for more points, keep a streak for a bonus.</p>
     <form onSubmit={e => { e.preventDefault(); if (code.trim().length === 6) navigate(`/rooms/${code.trim().toUpperCase()}`); }}><input aria-label="Room code" className="room-code-input" value={code} maxLength={6} autoFocus placeholder="ABC123" onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}/><Button type="submit" className="primary" disabled={code.length !== 6}><LogIn size={17}/> Join room</Button></form>
-    <p className="room-hint">Want to host? Open any folder and choose <strong>Host a live quiz</strong> from its menu.</p></div>;
+    <p className="room-hint">Hosting a quiz is Premium. Anyone can still join with a code. Hosts: open a folder and choose <strong>Host a live quiz</strong>.</p></div>;
 }
 /** /rooms/:code plays a room; /rooms/new?folder=… hosts one. */
 export default function RoomPage() {

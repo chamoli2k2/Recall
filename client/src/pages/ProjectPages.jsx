@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Plus, ArrowLeft, FolderPlus, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, FolderPlus, Trash2, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { useApp, useLoad } from '../hooks/useApp';
 import { Button, Loading, ErrorState, Empty, Modal, Field } from '../components/ui';
 import FolderTile from '../components/FolderTile';
+import { hasPremium } from '../../../shared/account.js';
 export function ProjectModal({ project, onClose }) {
   const { refresh } = useApp(); const navigate = useNavigate();
   const [form, setForm] = useState({ title: project?.title || '', description: project?.description || '', visibility: project?.visibility || 'private' });
@@ -28,9 +29,10 @@ export function ProjectModal({ project, onClose }) {
   </Modal>;
 }
 export function ProjectsPage() {
-  const { revision, refresh } = useApp(); const [create, setCreate] = useState(false);
-  const { data, loading, error } = useLoad(() => api('/projects'), [revision]);
+  const { revision, refresh, user } = useApp(); const navigate = useNavigate(); const [create, setCreate] = useState(false);
+  const { data, loading, error } = useLoad(() => hasPremium(user) ? api('/projects') : Promise.resolve({ projects: [] }), [revision, user?.account]);
   const projects = data?.projects || [];
+  if (!hasPremium(user)) return <><div className="page-heading"><div><span className="eyebrow">PREMIUM</span><h1>Projects</h1><p>Group folders you already have. This is a Premium feature.</p></div></div><Empty title="Projects are Premium" text="Upgrade to create projects. Folders themselves stay free." action={<Button className="primary" onClick={() => navigate('/premium')}><Crown size={16}/> See Premium</Button>}/></>;
   return <>
     <div className="page-heading"><div><span className="eyebrow">GROUP YOUR WORK</span><h1>Projects</h1><p>A project holds folders. Folders stay independent and can belong to more than one project.</p></div><Button className="primary" onClick={() => setCreate(true)}><Plus size={18}/> New project</Button></div>
     {loading ? <Loading/> : error ? <ErrorState message={error}/> : !projects.length ? <Empty title="No projects yet" text="Create a project, then add folders you already own or can read." action={<Button className="primary" onClick={() => setCreate(true)}><Plus size={16}/> Create a project</Button>}/> : <div className="folder-grid">{projects.map(p => <Link className="public-folder" to={`/projects/${p.id}`} key={p.id}><h3>{p.title}</h3><p>{p.description || 'A group of folders.'}</p><span>{p.folderCount} folders</span></Link>)}</div>}

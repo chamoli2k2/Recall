@@ -8,7 +8,7 @@ import { io as connect } from 'socket.io-client';
 import * as Y from 'yjs';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createApp } from '../src/app.js';
-import { allModels, CardDoc } from '../src/models/index.js';
+import { allModels, CardDoc, User } from '../src/models/index.js';
 import { attachRealtime, presence, docs, rooms } from '../src/realtime/index.js';
 const enabled = process.env.RUN_INTEGRATION === '1';
 let mongo, server, io, url, owner, editor, outsider, folderId, cardId;
@@ -27,6 +27,7 @@ before(async () => {
   io = attachRealtime(server, ['http://trusted.example']);
   [owner, editor, outsider] = [request.agent(url), request.agent(url), request.agent(url)];
   for (const [agent, username] of [[owner, 'owner'], [editor, 'editor'], [outsider, 'outsider']]) { const r = await agent.post('/api/auth/signup').send({ username, name: `${username} person`, email: `${username}@example.test`, password }); assert.equal(r.status, 201, JSON.stringify(r.body)); }
+  await User.updateMany({}, { $set: { account: 'premium' } });
   const f = await owner.post('/api/folders').send({ title: 'Live', visibility: 'private' }); folderId = f.body.folder.id;
   const c = await owner.post(`/api/folders/${folderId}/cards`).send({ front: { text: 'Hello' }, back: { text: 'World' } }); cardId = c.body.card.id;
   await owner.post(`/api/folders/${folderId}/members`).send({ username: 'editor', role: 'editor' });

@@ -6,6 +6,7 @@ import { onEvent } from './bus.js';
 import { PresenceStore } from './presence.js';
 import { DocStore } from './docs.js';
 import { RoomStore } from './rooms.js';
+import { hasPremium } from '../../../shared/account.js';
 const parseCookies = header => Object.fromEntries((header || '').split(';').map(p => p.trim().split('=')).filter(([k]) => k).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
 const same = (origin, host) => { try { return !!origin && new URL(origin).host === host; } catch { return false; } };
 export const presence = new PresenceStore();
@@ -55,6 +56,7 @@ export function attachRealtime(httpServer, origins) {
     socket.on('room:create', async (folderId, options = {}, ack = () => {}) => {
       if (!signedIn(ack)) return;
       try {
+        if (!hasPremium(socket.data.user)) return ack({ ok: false, error: 'Hosting a live quiz is a Premium feature.' });
         const folder = await accessFolder(folderId, socket.data.user);
         const cards = await Card.find({ folder: folder.id }).select('front back').lean();
         const room = rooms.create({ folder, host: socket.data.user, cards: cards.map(c => ({ ...c, id: c._id })), count: options?.count, seconds: options?.seconds });
