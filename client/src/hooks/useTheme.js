@@ -5,7 +5,7 @@ const read = () => { try { return localStorage.getItem(KEY); } catch { return nu
 export const resolveTheme = (preference = read()) => preference === 'dark' || preference === 'light' ? preference : systemDark() ? 'dark' : 'light';
 function apply(theme) {
   document.documentElement.dataset.theme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#16151d' : '#5a45e0');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#2a2834' : '#5a45e0');
 }
 // Theme preference: explicit 'light' | 'dark' saved in localStorage, otherwise follows the OS. Shared across all mounted toggles.
 export function useTheme() {
