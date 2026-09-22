@@ -1,20 +1,24 @@
 import { Folder, Card, User, Media, Revision } from '../models/index.js';
 import { accessFolder, mutateFolder, recordEvent, roleOf } from './accessService.js';
-import { hasPremium } from '../../../shared/account.js';
+import { requireFolderPremium, entitledOnFolder, teamFolderRole, teamIdsFor } from './teamAccess.js';
 import { assert } from '../utils/errors.js';
-const populate = [{ path: 'owner', select: 'name username' }, { path: 'members.user', select: 'name username' }];
+const populate = [{ path: 'owner', select: 'name username' }, { path: 'members.user', select: 'name username' }, { path: 'team', select: 'name kind' }];
 export async function presentFolder(folder, user) {
   await folder.populate(populate);
   const count = await Card.countDocuments({ folder: folder.id });
   const tags = (await Card.distinct('tags', { folder: folder._id })).slice(0, 10);
   const json = folder.toJSON(); delete json.writeEpoch;
-  const role = roleOf(folder, user);
+  // `premium` is answered per folder, because a seat unlocks the toolkit here and nowhere else.
+  const role = roleOf(folder, user) ?? (folder.team ? await teamFolderRole(folder, user) : null);
+  json.premium = await entitledOnFolder(user, folder);
   // Public readers see counts, never a list of private invitees.
   if (role !== 'owner' && !folder.members.some(m => String(m.user._id) === String(user?._id))) json.members = [];
   return { ...json, role, tags, cardCount: count, memberCount: folder.members.length + 1, likeCount: folder.likeCount || 0, copyCount: folder.copyCount || 0, liked: !!user?.savedFolders?.some(id => String(id) === folder.id), saved: !!user?.savedFolders?.some(id => String(id) === folder.id) };
 }
 export async function listFolders(user, scope) {
-  const filter = scope === 'explore' ? { visibility: 'global', archived: false } : { archived: false, $or: [{ owner: user._id }, { 'members.user': user._id }, { _id: { $in: user.savedFolders }, visibility: 'global' }] };
+  // Team folders sit in the member's library too, so a student does not have to go via the team page.
+  const teams = scope === 'explore' ? [] : await teamIdsFor(user);
+  const filter = scope === 'explore' ? { visibility: 'global', archived: false } : { archived: false, $or: [{ owner: user._id }, { 'members.user': user._id }, { _id: { $in: user.savedFolders }, visibility: 'global' }, ...(teams.length ? [{ team: { $in: teams } }] : [])] };
   const folders = await Folder.find(filter).sort({ updatedAt: -1 }).limit(200);
   return Promise.all(folders.map(f => presentFolder(f, user)));
 }
@@ -23,7 +27,7 @@ export async function updateFolder(id, user, body) {
   return mutateFolder(id, user, 'owner', async (folder, session) => {
     assert(folder.version === body.version, 409, 'This folder changed. Refresh and try again.', 'VERSION_CONFLICT');
     if (body.thumbnail) {
-      assert(hasPremium(user), 402, 'Folder covers are a Premium feature.', 'PREMIUM_REQUIRED');
+      await requireFolderPremium(user, folder, 'Folder covers');
       assert(await Media.exists({ _id: body.thumbnail, folder: folder.id }).session(session), 400, 'Thumbnail does not belong to this folder.');
     }
     const { version, ...changes } = body; Object.assign(folder, changes); folder.version += 1;
@@ -35,7 +39,7 @@ export async function setMember(id, user, username, role) {
     const target = await User.findOne({ username }).session(session); assert(target, 404, 'No user with that username. Ask them to create an account first.');
     assert(target.id !== String(folder.owner), 400, 'The owner already has full access.');
     folder.members = folder.members.filter(m => String(m.user) !== target.id);
-    if (role === 'editor') assert(hasPremium(user), 402, 'Inviting editors is a Premium feature.', 'PREMIUM_REQUIRED');
+    if (role === 'editor') await requireFolderPremium(user, folder, 'Inviting editors');
     if (role !== 'remove') folder.members.push({ user: target.id, role });
     folder.version += 1; await folder.save({ session }); await recordEvent(folder, user, 'folder.members.changed', role === 'remove' ? `Removed @${username}` : `Added @${username} as ${role}`, session); return folder;
   });

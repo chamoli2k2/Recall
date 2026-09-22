@@ -3,7 +3,7 @@ import * as premium from '../services/premiumService.js';
 import { premiumOrderSchema } from '../middleware/validate.js';
 import { assert } from '../utils/errors.js';
 
-async function toWebp(file) {
+export async function toWebp(file) {
   assert(file, 400, 'Upload a screenshot of the payment.', 'PROOF_REQUIRED');
   let data;
   try { data = await sharp(file.buffer, { limitInputPixels: 25000000 }).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer(); }

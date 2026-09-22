@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { Card, Media, Revision, Progress } from '../models/index.js';
 import * as cards from '../services/cardService.js';
 import { accessFolder, mutateFolder } from '../services/accessService.js';
+import { requireFolderPremium } from '../services/teamAccess.js';
 import { assert } from '../utils/errors.js';
 import { parseFile, toCsv, MAX_CARDS } from '../services/importService.js';
 import { cardSchema } from '../middleware/validate.js';
@@ -21,7 +22,9 @@ export const upload = async (req, res) => {
 };
 // Import runs in two steps from the UI: dryRun=1 returns a preview, then the same upload commits. Parsing never touches the database.
 export const importFile = async (req, res) => {
-  assert(req.file, 400, 'Choose a file to import.'); await accessFolder(req.params.id, req.user, 'editor');
+  assert(req.file, 400, 'Choose a file to import.');
+  // Gated here rather than on the route, because a seat entitles the holder in this folder only.
+  await requireFolderPremium(req.user, await accessFolder(req.params.id, req.user, 'editor'), 'Importing cards');
   const { format, cards: parsed } = await parseFile(req.file.buffer, req.file.originalname, req.file.mimetype);
   const valid = parsed.map(c => cardSchema.safeParse(c)).filter(r => r.success).map(r => r.data);
   assert(valid.length, 400, format === 'csv' ? 'No cards found. Use two columns (front, back) or a header row naming front and back.' : 'No cards were found in that file.');
@@ -31,6 +34,7 @@ export const importFile = async (req, res) => {
   res.status(201).json({ format, imported: created.length, skipped: parsed.length - valid.length });
 };
 export const exportFile = async (req, res) => {
+  await requireFolderPremium(req.user, await accessFolder(req.params.id, req.user), 'Exporting cards');
   const { folder, cards: list } = await cards.exportCards(req.params.id, req.user); const name = folder.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'recall-export';
   if (req.query.format === 'csv') return res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}.csv"` }).send(toCsv(list));
   res.set({ 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}.json"` }).send(JSON.stringify({ app: 'recall', version: 1, exportedAt: new Date().toISOString(), folder: { title: folder.title, description: folder.description, tags: [...new Set(list.flatMap(c => c.tags))] }, cards: list }, null, 2));

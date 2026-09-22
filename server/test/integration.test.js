@@ -7,7 +7,8 @@ import sharp from 'sharp';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { connectDatabase } from '../src/config/database.js';
 import { createApp } from '../src/app.js';
-import { allModels, Review, User, Notification, Relationship, PremiumOrder } from '../src/models/index.js';
+import { allModels, Review, User, Notification, Relationship, PremiumOrder, Team } from '../src/models/index.js';
+import { teamPlanById } from '../../shared/teams.js';
 const enabled = process.env.RUN_INTEGRATION === '1';
 let mongo, app, owner, editor, outsider, folderId, cardId;
 const password = 'Integration-only-password-2026';
@@ -170,6 +171,147 @@ integration('a gateway payment is verified against its signature and can only ev
   assert.equal((await PremiumOrder.findById(order.id)).gatewayPaymentId, 'pay_signature_test');
   assert.equal((await Notification.countDocuments({ user: buyer._id, type: 'premium.approved' })), 1, 'and the buyer is told exactly once');
   delete process.env.RAZORPAY_WEBHOOK_SECRET;
+});
+integration('a classroom: seats are sold, a seat unlocks Premium only inside the team, and the last seat cannot be sold twice', async () => {
+  // Three free accounts so nothing here can be explained by a personal subscription.
+  const [teacher, alice, bob] = [request.agent(app), request.agent(app), request.agent(app)];
+  for (const [agent, username] of [[teacher, 'teach'], [alice, 'alice'], [bob, 'bob']]) {
+    const r = await agent.post('/api/auth/signup').send({ username, name: username, email: `${username}@example.test`, password });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+  }
+  await User.updateMany({ username: { $in: ['teach', 'alice', 'bob'] } }, { $set: { account: 'normal', premiumPlan: '', premiumExpiresAt: null } });
+
+  const made = await teacher.post('/api/teams').send({ name: 'Physics 101', kind: 'classroom', description: 'Year one mechanics' });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const teamId = made.body.team.id;
+  assert.equal(made.body.team.seats, 0);
+  assert.equal(made.body.team.active, false, 'a new team is unpaid and cannot be invited into');
+  assert.equal((await teacher.post(`/api/teams/${teamId}/invites`).send({ role: 'student' })).status, 402, 'no seats, no invites');
+
+  // Seats are quoted from the team's own state, never from the client.
+  const quoted = await teacher.post(`/api/teams/${teamId}/quote`).send({ plan: 'team-monthly', seats: 6 });
+  assert.equal(quoted.status, 200, JSON.stringify(quoted.body));
+  assert.equal(quoted.body.kind, 'team-new');
+  assert.equal(quoted.body.amount, teamPlanById('team-monthly').perSeat * 6);
+
+  const png = await sharp({ create: { width: 16, height: 16, channels: 3, background: '#4455cc' } }).png().toBuffer();
+  const buy = await teacher.post(`/api/teams/${teamId}/order`)
+    .field('plan', 'team-monthly').field('seats', '6').field('name', 'Teach Er').field('email', 'teach@example.test')
+    .field('phone', '9999999999').field('country', 'India').field('address', '1 School Road').attach('proof', png, 'upi.png');
+  assert.equal(buy.status, 201, JSON.stringify(buy.body));
+  assert.equal(buy.body.order.seats, 6);
+  assert.equal(buy.body.order.amount, teamPlanById('team-monthly').perSeat * 6 * 100, 'stored in paise');
+
+  const orders = await owner.get('/api/admin/orders');
+  const seatOrder = orders.body.orders.find(o => o.id === buy.body.order.id);
+  assert.equal(seatOrder.kind, 'team-new');
+  assert.equal((await owner.patch(`/api/admin/orders/${seatOrder.id}`).send({ status: 'approved' })).status, 200);
+
+  const paid = await teacher.get(`/api/teams/${teamId}`);
+  assert.equal(paid.body.team.seats, 6);
+  assert.equal(paid.body.team.active, true);
+  assert.equal(paid.body.team.memberCount, 1, 'the owner holds the first seat');
+  assert.ok(paid.body.team.daysLeft > 28 && paid.body.team.daysLeft <= 30);
+
+  // The plaintext code is returned once. Everything after that is the hash.
+  const invited = await teacher.post(`/api/teams/${teamId}/invites`).send({ role: 'student' });
+  assert.equal(invited.status, 201, JSON.stringify(invited.body));
+  const code = invited.body.code;
+  assert.match(code, /^[A-Z2-9]{8}$/);
+  assert.equal(invited.body.invite.code, undefined, 'the code is never echoed back in the invite record');
+
+  const peek = await alice.get(`/api/teams/code/${code}`);
+  assert.equal(peek.body.team.name, 'Physics 101');
+  assert.equal(peek.body.roleLabel, 'Student');
+  assert.equal((await alice.post('/api/teams/join').send({ code })).status, 201);
+  assert.equal((await alice.post('/api/teams/join').send({ code })).status, 400, 'joining twice takes a second seat from nobody');
+  assert.equal((await bob.post('/api/teams/join').send({ code: 'AAAAAAAA' })).status, 404, 'a wrong code reveals nothing');
+
+  // A team folder: the roster decides access, so Alice can open it without being invited to it.
+  const tf = await teacher.post(`/api/teams/${teamId}/folders`).send({ title: 'Newton', description: '', color: 'blue', icon: 'flask', visibility: 'private' });
+  assert.equal(tf.status, 201, JSON.stringify(tf.body));
+  const teamFolder = tf.body.folder.id;
+  await teacher.post(`/api/folders/${teamFolder}/cards`).send({ front: { text: 'F = ?' }, back: { text: 'ma' } });
+  const asAlice = await alice.get(`/api/folders/${teamFolder}`);
+  assert.equal(asAlice.status, 200, 'a student reads the class folder');
+  assert.equal(asAlice.body.folder.role, 'viewer');
+  assert.equal(asAlice.body.folder.premium, true, 'her seat entitles her here');
+  assert.equal((await bob.get(`/api/folders/${teamFolder}`)).status, 404, 'a non-member cannot see it at all');
+  assert.ok((await alice.get('/api/folders')).body.folders.some(f => f.id === teamFolder), 'and it appears in her library');
+
+  // The boundary: the same free account gets nothing in its own folder.
+  const own = await alice.post('/api/folders').send({ title: 'My own notes', description: '', color: 'violet', icon: 'layers', visibility: 'private' });
+  assert.equal(own.body.folder.premium, false, 'a seat does not follow her home');
+  assert.equal((await alice.get(`/api/folders/${own.body.folder.id}/export`)).status, 402);
+  assert.equal((await alice.get(`/api/folders/${teamFolder}/export`)).status, 200, 'but the toolkit works on team content');
+
+  // Seats: the last one cannot be sold twice. Six seats, five taken, two people racing.
+  const extras = [];
+  for (const username of ['stu1', 'stu2', 'stu3', 'stu4']) {
+    const agent = request.agent(app);
+    const up = await agent.post('/api/auth/signup').send({ username, name: username, email: `${username}@example.test`, password });
+    assert.equal(up.status, 201, JSON.stringify(up.body));
+    extras.push(agent);
+  }
+  for (const agent of extras.slice(0, 3)) assert.equal((await agent.post('/api/teams/join').send({ code })).status, 201);
+  const full = await teacher.get(`/api/teams/${teamId}`);
+  assert.equal(full.body.team.memberCount, 5);
+  assert.equal(full.body.team.seatsLeft, 1);
+
+  const racers = [extras[3], request.agent(app)];
+  await racers[1].post('/api/auth/signup').send({ username: 'stu5', name: 'stu5', email: 'stu5@example.test', password });
+  const settled = await Promise.all(racers.map(a => a.post('/api/teams/join').send({ code })));
+  const won = settled.filter(r => r.status === 201);
+  assert.equal(won.length, 1, `exactly one racer takes the last seat, got ${settled.map(r => r.status).join()}`);
+  assert.equal(settled.find(r => r.status !== 201).body.code, 'NO_SEATS');
+  const after = await teacher.get(`/api/teams/${teamId}`);
+  assert.equal(after.body.team.memberCount, 6, 'the roster never exceeds the seats that were paid for');
+  assert.equal(after.body.team.seatsLeft, 0);
+
+  // Extra seats bought right after paying cost full price, because no time has been used up yet.
+  const perSeat = teamPlanById('team-monthly').perSeat;
+  const fresh = await teacher.post(`/api/teams/${teamId}/quote`).send({ plan: 'team-monthly', seats: 8 });
+  assert.equal(fresh.body.kind, 'team-seats');
+  assert.equal(fresh.body.seats, 8);
+  assert.equal(fresh.body.amount, perSeat * 2);
+
+  // Ten days into the term, the same two seats are prorated down to what is left of it.
+  const tenLeft = new Date(Date.now() + 10 * 86400000);
+  await Team.updateOne({ _id: teamId }, { $set: { expiresAt: tenLeft } });
+  const topUp = await teacher.post(`/api/teams/${teamId}/quote`).send({ plan: 'team-monthly', seats: 8 });
+  assert.equal(topUp.body.kind, 'team-seats');
+  assert.ok(topUp.body.amount < perSeat * 2 && topUp.body.amount > 0, `two seats for a third of a term, quoted ${topUp.body.amount}`);
+  assert.equal(new Date(topUp.body.expiresAt).getTime(), tenLeft.getTime(), 'a top-up does not move the renewal date');
+  // Renewing at the current seat count is a different quote from buying more.
+  const renew = await teacher.post(`/api/teams/${teamId}/quote`).send({ plan: 'team-monthly', seats: 6 });
+  assert.equal(renew.body.kind, 'team-renew');
+  assert.equal(renew.body.amount, perSeat * 6);
+
+  // Removing someone frees the seat immediately, so nobody pays for an empty chair.
+  const aliceId = after.body.members.find(m => m.username === 'alice').id;
+  assert.equal((await teacher.delete(`/api/teams/${teamId}/members/${aliceId}`)).status, 200);
+  assert.equal((await teacher.get(`/api/teams/${teamId}`)).body.team.seatsLeft, 1);
+  assert.equal((await alice.get(`/api/folders/${teamFolder}`)).status, 404, 'and her access goes with it');
+
+  // A teacher sees the class; a student does not.
+  const teacherPromoted = after.body.members.find(m => m.username === 'stu1').id;
+  assert.equal((await teacher.patch(`/api/teams/${teamId}/members/${teacherPromoted}`).send({ role: 'teacher' })).status, 200);
+  const view = await extras[0].get(`/api/teams/${teamId}/progress`);
+  assert.equal(view.status, 200, JSON.stringify(view.body));
+  assert.equal(view.body.totalCards, 1);
+  assert.ok(view.body.rows.some(r => r.username === 'stu2' && r.coverage === 0), 'a student who has not studied shows zero coverage');
+  assert.equal((await extras[1].get(`/api/teams/${teamId}/progress`)).status, 403, 'a student cannot read the class report');
+
+  // Assignments reach the class as notifications.
+  const assigned = await teacher.post(`/api/teams/${teamId}/assignments`).send({ folderId: teamFolder, title: 'Chapter 1', instructions: 'Finish before Friday' });
+  assert.equal(assigned.status, 201, JSON.stringify(assigned.body));
+  const inbox = await extras[1].get('/api/notifications');
+  assert.ok(inbox.body.notifications.some(n => n.type === 'team.assignment'), JSON.stringify(inbox.body.notifications.map(n => n.type)));
+
+  // A lapse closes the team's toolkit without anyone revoking anything.
+  await Team.updateOne({ _id: teamId }, { $set: { expiresAt: new Date(Date.now() - 86400000) } });
+  assert.equal((await extras[1].get(`/api/folders/${teamFolder}`)).status, 404, 'an unpaid team closes its folders');
+  assert.equal((await extras[1].post('/api/teams/join').send({ code })).status, 400);
 });
 integration('every failure comes back in one envelope with a traceable request id', async () => {
   const missing = await outsider.get('/api/nope');

@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { Session, User, Card, CardDoc } from '../models/index.js';
 import { hashToken } from '../middleware/auth.js';
 import { accessFolder } from '../services/accessService.js';
+import { requireFolderPremium } from '../services/teamAccess.js';
 import { onEvent } from './bus.js';
 import { PresenceStore } from './presence.js';
 import { DocStore } from './docs.js';
@@ -9,7 +10,6 @@ import { RoomStore } from './rooms.js';
 import { notifications, presentNotification } from '../services/notificationService.js';
 import { toAppError, GENERIC } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
-import { hasPremium } from '../../../shared/account.js';
 /**
  * Sockets answer with `{ ok, error }` instead of HTTP statuses, so failures run through the same
  * classifier and only exposed messages are sent back. `translate` lets a handler keep the wording
@@ -75,8 +75,9 @@ export function attachRealtime(httpServer, origins) {
     socket.on('room:create', async (folderId, options = {}, ack = () => {}) => {
       if (!signedIn(ack)) return;
       try {
-        if (!hasPremium(socket.data.user)) return ack({ ok: false, error: 'Hosting a live quiz is a Premium feature.' });
         const folder = await accessFolder(folderId, socket.data.user);
+        // A teacher can run a quiz on their class's own folders without a personal subscription.
+        await requireFolderPremium(socket.data.user, folder, 'Hosting a live quiz');
         const cards = await Card.find({ folder: folder.id }).select('front back').lean();
         const room = rooms.create({ folder, host: socket.data.user, cards: cards.map(c => ({ ...c, id: c._id })), count: options?.count, seconds: options?.seconds });
         enterRoom(room.code); ack({ ok: true, code: room.code, room: rooms.snapshot(room.code, socket.data.user.id) });

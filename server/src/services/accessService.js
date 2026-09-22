@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Folder, Activity, DomainEvent } from '../models/index.js';
 import { assert } from '../utils/errors.js';
+import { teamFolderRole } from './teamAccess.js';
 import { beginCollecting, queueEvent, flushEvents } from '../realtime/bus.js';
 export function roleOf(folder, user) {
   if (!user) return folder.visibility === 'global' ? 'viewer' : null;
@@ -12,7 +13,8 @@ export async function accessFolder(id, user, level = 'viewer', session) {
   assert(mongoose.isValidObjectId(id), 404, 'Folder not found.');
   const folder = await Folder.findById(id).session(session ?? null);
   assert(folder, 404, 'Folder not found.');
-  const role = roleOf(folder, user);
+  // A team folder grants access through the roster, so only fall back to that when nothing else fits.
+  const role = roleOf(folder, user) ?? (folder.team ? await teamFolderRole(folder, user, session) : null);
   assert(role, 404, 'Folder not found or access has been removed.');
   assert(level === 'viewer' || role === 'owner' || (level === 'editor' && role === 'editor'), 403, 'You do not have permission to make this change.');
   return folder;
