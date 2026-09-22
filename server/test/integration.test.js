@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { connectDatabase } from '../src/config/database.js';
 import { createApp } from '../src/app.js';
-import { allModels, Review, User, Notification, Relationship } from '../src/models/index.js';
+import { allModels, Review, User, Notification, Relationship, PremiumOrder } from '../src/models/index.js';
 const enabled = process.env.RUN_INTEGRATION === '1';
 let mongo, app, owner, editor, outsider, folderId, cardId;
 const password = 'Integration-only-password-2026';
@@ -133,6 +133,43 @@ integration('dashboard is staff-only; premium routes reject a normal account', a
   // A lapsed subscription closes the Premium routes again without touching the role.
   await User.updateOne({ username: 'outsider' }, { $set: { premiumExpiresAt: new Date(Date.now() - 86400000) } });
   assert.equal((await outsider.get('/api/projects')).status, 402);
+});
+integration('a gateway payment is verified against its signature and can only ever be granted once', async () => {
+  const secret = 'webhook-test-secret';
+  process.env.RAZORPAY_WEBHOOK_SECRET = secret;
+  const buyer = await User.findOne({ username: 'outsider' });
+  await User.updateOne({ _id: buyer._id }, { $set: { account: 'normal', premiumPlan: '', premiumExpiresAt: null } });
+  await PremiumOrder.deleteMany({ user: buyer._id });
+  await Notification.deleteMany({ user: buyer._id });
+  const order = await PremiumOrder.create({
+    user: buyer._id, plan: 'yearly', method: 'razorpay', amount: 149900, currency: 'INR',
+    gatewayOrderId: 'order_signature_test', status: 'pending',
+    name: 'Out Sider', email: 'out@example.test', phone: '9999999999', country: 'India', address: '1 Demo Street',
+  });
+  const raw = JSON.stringify({ event: 'payment.captured', payload: { payment: { entity: { id: 'pay_signature_test', order_id: 'order_signature_test', status: 'captured' } } } });
+  const post = signature => request(app).post('/api/premium/webhook/razorpay').set('Content-Type', 'application/json').set('X-Razorpay-Signature', signature).send(raw);
+
+  const forged = await post(crypto.createHmac('sha256', 'not-the-secret').update(raw).digest('hex'));
+  assert.equal(forged.status, 400, 'an unsigned caller cannot hand out Premium');
+  assert.equal((await PremiumOrder.findById(order.id)).status, 'pending');
+
+  const signature = crypto.createHmac('sha256', secret).update(raw).digest('hex');
+  const first = await post(signature);
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.handled, 'approved');
+  const granted = await User.findById(buyer._id);
+  assert.equal(granted.account, 'premium');
+  assert.equal(granted.premiumPlan, 'yearly');
+  const expiry = granted.premiumExpiresAt.getTime();
+
+  // Razorpay retries webhooks, and the browser callback races them. Neither may extend the plan twice.
+  const replay = await post(signature);
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.alreadySettled, true);
+  assert.equal((await User.findById(buyer._id)).premiumExpiresAt.getTime(), expiry, 'a replayed webhook adds no extra days');
+  assert.equal((await PremiumOrder.findById(order.id)).gatewayPaymentId, 'pay_signature_test');
+  assert.equal((await Notification.countDocuments({ user: buyer._id, type: 'premium.approved' })), 1, 'and the buyer is told exactly once');
+  delete process.env.RAZORPAY_WEBHOOK_SECRET;
 });
 integration('every failure comes back in one envelope with a traceable request id', async () => {
   const missing = await outsider.get('/api/nope');

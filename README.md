@@ -120,6 +120,14 @@ A channel that throws is logged and skipped rather than propagated: a failed not
 
 Plans live in `shared/account.js` (`monthly`, `quarterly`, `yearly`, `lifetime`) and are the same list on both sides, so the checkout, the validator, and the dashboard cannot disagree. The buyer picks one; approval stamps `premiumPlan` and `premiumExpiresAt` on the user, where `premiumExpiryAfter` extends an unexpired subscription instead of truncating it and restarts from today if it already lapsed. `hasPremium` then reads as "the role says premium **and** the window is open", so a lapse closes the gated routes without an admin touching the role, and `requirePremium` picks that up on the next request. A lifetime plan stores no end date. Admins see plan, days remaining, and a colour-coded state per account in the dashboard.
 
+### Paying
+
+Two ways to pay sit side by side, and the buyer chooses. `server/src/services/payments/index.js` describes each method once and advertises only the ones this server can actually use: the online option appears when `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are set, the UPI-transfer option appears unless `MANUAL_PAYMENT=off`. The checkout page renders whatever that list contains, so retiring the manual flow is an environment change rather than a UI deploy.
+
+Both routes converge on `fulfilOrder`, the only code that applies a plan. It flips the status with a conditional update on `{ _id, status: 'pending' }`, and the order collection has sparse unique indexes on the gateway order and payment ids. Between them, a webhook retry, a duplicate delivery, and a browser callback racing the webhook can only ever grant the plan once — the loser gets `alreadySettled` and nobody gains extra days.
+
+The gateway is spoken to over plain `fetch` rather than its SDK, so the trust boundary is small enough to read: an order is reserved server-side, the browser pays in Razorpay's own window, and nothing is granted until an HMAC-SHA256 signature verifies under `crypto.timingSafeEqual`. The webhook is the authoritative path, since a buyer who closes the tab after paying never sends the callback. Its route is mounted on `express.raw()` **before** the JSON parser, because the signature covers the exact bytes the gateway sent and a re-serialised body will not match — `server/test/payments.test.js` asserts exactly that.
+
 ### Security
 
 | Threat | Control |

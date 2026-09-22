@@ -9,13 +9,18 @@ import routes from './routes/index.js';
 import healthRoutes from './routes/health.js';
 import { optionalAuth } from './middleware/auth.js';
 import { requestContext, notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import { webhook as premiumWebhook } from './controllers/premiumController.js';
+import { isConfigured as razorpayConfigured } from './services/payments/razorpay.js';
+import { asyncHandler } from './utils/errors.js';
 export const trustedOrigins = () => (process.env.CLIENT_ORIGIN || 'http://localhost:4173').split(',').map(v => v.trim()).filter(Boolean);
 export function createApp() {
   const app = express(); app.disable('x-powered-by'); if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
   app.use(requestContext);
   const origins = trustedOrigins();
   // connect-src includes ws(s) so the same-origin Socket.IO connection is allowed by CSP in every browser.
-  app.use(helmet({ contentSecurityPolicy: { directives: { "img-src": ["'self'", 'blob:', 'data:'], "script-src": ["'self'"], "style-src": ["'self'", "'unsafe-inline'"], "connect-src": ["'self'", 'ws:', 'wss:', ...origins] } } }));
+  // The gateway's checkout runs in its own script and iframe, so it only widens the policy when configured.
+  const gateway = razorpayConfigured() ? ['https://checkout.razorpay.com', 'https://api.razorpay.com'] : [];
+  app.use(helmet({ contentSecurityPolicy: { directives: { "img-src": ["'self'", 'blob:', 'data:', ...(gateway.length ? ['https:'] : [])], "script-src": ["'self'", ...gateway], "style-src": ["'self'", "'unsafe-inline'"], "frame-src": ["'self'", ...gateway], "connect-src": ["'self'", 'ws:', 'wss:', ...origins, ...gateway] } } }));
   app.use(cors({ origin: origins, credentials: true }));
   app.use('/api', rateLimit({ windowMs: 60000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false }));
   // CSRF guard for writes. Same-origin requests (Origin host === Host header) are always allowed, so the standard
@@ -24,6 +29,8 @@ export function createApp() {
   const trustedOrigin = req => !req.headers.origin || origins.includes(req.headers.origin) || sameOrigin(req);
   app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && (!trustedOrigin(req) || req.headers['sec-fetch-site'] === 'cross-site')) return res.status(403).json({ error: 'Request origin is not allowed.' }); next(); });
   app.use('/api', healthRoutes);
+  // The gateway signs the exact bytes it sent, so this one route has to see them before any parser does.
+  app.post('/api/premium/webhook/razorpay', express.raw({ type: '*/*', limit: '64kb' }), asyncHandler(premiumWebhook));
   app.use(express.json({ limit: '256kb' })); app.use(cookieParser()); app.use('/api', optionalAuth, routes);
   app.use('/api', notFoundHandler);
   const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..', 'dist');

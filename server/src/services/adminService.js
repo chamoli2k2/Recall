@@ -1,6 +1,6 @@
 import { User, PremiumOrder } from '../models/index.js';
-import { canAssign, ACCOUNTS, planById, premiumDaysLeft, premiumExpiryAfter, hasPremium } from '../../../shared/account.js';
-import { notify } from './notificationService.js';
+import { canAssign, ACCOUNTS, planById, premiumDaysLeft, hasPremium } from '../../../shared/account.js';
+import { fulfilOrder } from './premiumService.js';
 import { assert } from '../utils/errors.js';
 
 const publicAdmin = u => ({
@@ -39,27 +39,14 @@ export async function setAccount(actor, userId, account) {
 export async function listOrders(status) {
   const filter = status ? { status } : {};
   const rows = await PremiumOrder.find(filter).sort({ createdAt: -1 }).limit(80).populate('user', 'name username account');
-  return rows.map(o => ({ ...o.toJSON(), hasProof: true, proofUrl: `/api/premium/orders/${o.id}/proof` }));
+  // Only a manual order has a screenshot to review; a gateway order carries its payment id instead.
+  return rows.map(o => ({ ...o.toJSON(), hasProof: o.method === 'manual', proofUrl: o.method === 'manual' ? `/api/premium/orders/${o.id}/proof` : null }));
 }
 
+/** Approving by hand and a verified gateway payment converge on the same fulfilment. */
 export async function decideOrder(actor, orderId, status) {
   assert(['approved', 'declined'].includes(status), 400, 'Use approved or declined.');
-  const order = await PremiumOrder.findById(orderId);
-  assert(order && order.status === 'pending', 404, 'No pending order.');
-  order.status = status;
-  order.reviewedBy = actor.id;
-  await order.save();
-  let expiresAt = null;
-  if (status === 'approved') {
-    const user = await User.findById(order.user);
-    if (user) {
-      expiresAt = premiumExpiryAfter(user, planById(order.plan));
-      if ((user.account || 'normal') === 'normal') user.account = 'premium';
-      user.premiumPlan = order.plan;
-      user.premiumExpiresAt = expiresAt;
-      await user.save();
-    }
-  }
-  await notify(order.user, status === 'approved' ? 'premium.approved' : 'premium.declined', { actor, data: { plan: order.plan, expiresAt } });
+  const { order, alreadySettled } = await fulfilOrder(orderId, status, { actor });
+  assert(!alreadySettled, 404, 'No pending order.');
   return order;
 }

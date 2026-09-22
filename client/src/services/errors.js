@@ -11,7 +11,7 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status; this.code = code; this.requestId = requestId; this.details = details;
   }
-  get isOffline() { return this.status === 0; }
+  get isOffline() { return this.code === 'NETWORK'; }
   get needsSignIn() { return this.status === 401; }
   get needsPremium() { return this.status === 402 || this.code === 'PREMIUM_REQUIRED'; }
   get isConflict() { return this.status === 409; }
