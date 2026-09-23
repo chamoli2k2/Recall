@@ -6,6 +6,7 @@ import { notify, notifyStaff } from './notificationService.js';
 import { availableMethods, requireMethod, razorpay } from './payments/index.js';
 import { logger } from '../utils/logger.js';
 import { assert, badRequest, notFound } from '../utils/errors.js';
+import { BRAND } from '../../../shared/brand.js';
 
 const presentOrder = order => ({
   id: order.id, plan: order.plan, method: order.method, status: order.status,
@@ -56,8 +57,8 @@ export const mySubscription = user => ({
 
 /**
  * The single place a paid plan is applied, whichever way it was paid for. The status change is a
- * conditional update, so a gateway webhook and the browser callback racing each other — or the same
- * webhook delivered twice — can only ever grant the plan once.
+ * conditional update, so a gateway webhook racing the browser callback, or the same
+ * webhook delivered twice, can only ever grant the plan once.
  */
 export async function fulfilOrder(orderId, status, { actor = null, paymentId = null } = {}) {
   const update = { status, ...(actor ? { reviewedBy: actor.id } : {}), ...(paymentId ? { gatewayPaymentId: paymentId } : {}) };
@@ -129,7 +130,7 @@ export async function startCheckout(user, body) {
     const gateway = await razorpay.createOrder({ amount: order.amount, currency: order.currency, receipt: order.id, notes: { plan: order.plan, username: user.username } });
     order.gatewayOrderId = gateway.id;
     await order.save();
-    return { order: presentOrder(order), checkout: { key: razorpay.keyId(), orderId: gateway.id, amount: gateway.amount, currency: gateway.currency, name: 'Recall', description: describe(order), prefill: { name: order.name, email: order.email, contact: order.phone } } };
+    return { order: presentOrder(order), checkout: { key: razorpay.keyId(), orderId: gateway.id, amount: gateway.amount, currency: gateway.currency, name: BRAND.name, description: describe(order), prefill: { name: order.name, email: order.email, contact: order.phone } } };
   } catch (e) {
     // Never strand a pending order the buyer cannot retry past.
     await PremiumOrder.deleteOne({ _id: order.id, status: 'pending' });
@@ -143,7 +144,7 @@ export async function confirmCheckout(user, { orderId, paymentId, signature }) {
   if (!order) throw notFound('That payment does not match an order.', 'NO_ORDER');
   if (!razorpay.checkoutSignatureValid({ orderId, paymentId, signature })) {
     logger.warn('rejected a razorpay callback with a bad signature', { orderId, userId: user.id });
-    throw badRequest('We could not verify that payment. Nothing has been charged twice — contact us if money left your account.', 'BAD_SIGNATURE');
+    throw badRequest('We could not verify that payment. Nothing has been charged twice, but do contact us if money left your account.', 'BAD_SIGNATURE');
   }
   if (order.status === 'approved') return { order: presentOrder(order), subscription: mySubscription(await User.findById(user.id)) };
   await fulfilOrder(order.id, 'approved', { paymentId });

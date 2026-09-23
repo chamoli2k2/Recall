@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { BRAND } from '../../../shared/brand.js';
 
 /**
  * Mirrors the server envelope `{ error, code, requestId }`. Carrying the code means callers branch
@@ -19,7 +20,7 @@ export class ApiError extends Error {
 
 const FRIENDLY = {
   RATE_LIMITED: 'Too many requests. Give it a moment and try again.',
-  DB_UNAVAILABLE: 'Recall cannot reach its database right now. Please try again shortly.',
+  DB_UNAVAILABLE: `${BRAND.name} cannot reach its database right now. Please try again shortly.`,
   STALE_VERSION: 'Someone else changed this first. Reload and try again.',
 };
 

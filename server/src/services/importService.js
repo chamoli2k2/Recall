@@ -60,7 +60,7 @@ export function parseMarkdown(text) {
   if (!cards.length) for (const m of src.matchAll(/^#{1,6}\s+(.+)\n([\s\S]*?)(?=\n#{1,6}\s|$)/gm)) cards.push(makeCard({ front: m[1], back: strip(m[2]), tags: tagsFrom(m[2]) }));
   return cards.filter(usable);
 }
-/** Recall's own JSON export (or any { cards: [{ front, back, tags }] } / [{ front, back }] document). */
+/** Our own JSON export (or any { cards: [{ front, back, tags }] } / [{ front, back }] document). */
 export function parseJson(text) {
   const data = JSON.parse(String(text)); const list = Array.isArray(data) ? data : Array.isArray(data.cards) ? data.cards : [];
   return list.map(c => makeCard({ front: c.front?.text ?? c.front, back: c.back?.text ?? c.back, tags: c.tags, hint: c.hint, source: c.source })).filter(usable);

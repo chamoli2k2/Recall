@@ -9,11 +9,11 @@ Recall's server never schedules requests to itself. All scheduling lives outside
 | `GET /api/health` | Liveness | Express is handling requests. No database call. | `200` | Connection refused / timeout (process is down or asleep) |
 | `GET /api/ready` | Readiness | MongoDB answers `ping` within `READINESS_TIMEOUT_MS` (default 2000 ms, clamped 100–10000). | `200 {"ok":true,"status":"ready","checks":{"database":"up"}}` | `503 {"ok":false,"status":"unavailable","checks":{"database":"down"}}` |
 
-**Liveness** answers "is the process alive?" and is what you hit to wake an idle host. **Readiness** answers "can it serve users right now?" — a live process with a dead database is not ready. Alerting should watch readiness; wake-up pings can use liveness. Both are public, are rate limited with the rest of `/api` (300 requests/minute per IP — a 5-minute schedule is nowhere near that), and never include connection strings, stack traces, or driver error text.
+**Liveness** answers "is the process alive?" and is what you hit to wake an idle host. **Readiness** answers "can it serve users right now?", and a live process with a dead database is not ready. Alerting should watch readiness; wake-up pings can use liveness. Both are public, are rate limited with the rest of `/api` (300 requests/minute per IP, so a 5-minute schedule is nowhere near that), and never include connection strings, stack traces, or driver error text.
 
 ## The ping script
 
-`scripts/healthcheck.js` — Node 22 or newer, built-in `fetch`, no npm dependencies, so it can be copied alone to the monitoring machine.
+`scripts/healthcheck.js` needs Node 22 or newer, uses the built-in `fetch`, and has no npm dependencies, so it can be copied alone to the monitoring machine.
 
 | Behaviour | Value |
 | --- | --- |
@@ -79,12 +79,12 @@ Any uptime service can call the endpoint directly; the script is not required:
 - **Timeout:** 10 seconds is reasonable; a cold start on a sleeping host may take several seconds.
 - Alert on readiness failures; treat a single liveness failure as a possible cold start and alert after two or more consecutive failures.
 
-Examples of services with free tiers that support this: UptimeRobot, Better Stack, Healthchecks.io (in "ping the URL" mode), Cronitor, and cloud-provider uptime checks. This repository does not provision, configure, or pay for any of them — sign up and paste the URL yourself.
+Examples of services with free tiers that support this: UptimeRobot, Better Stack, Healthchecks.io (in "ping the URL" mode), Cronitor, and cloud-provider uptime checks. This repository does not provision, configure, or pay for any of them. Sign up and paste the URL yourself.
 
 ## Expectations and limits
 
 - **Fewer idle shutdowns, not zero.** Free-tier hosts that sleep after ~15 minutes of inactivity usually stay warm with a 5-minute ping, but the provider decides, and the policy can change.
 - **No uptime guarantee.** The ping proves reachability at one moment from one network; it does not prevent crashes, deploy downtime, or database outages.
-- **Usage limits still apply.** Pings consume the host's request/instance-hour allowance like any other traffic and cannot bypass monthly caps or forced sleeps once a quota is exhausted. If keeping the app warm exhausts the quota sooner, the ping made things worse — measure.
+- **Usage limits still apply.** Pings consume the host's request/instance-hour allowance like any other traffic and cannot bypass monthly caps or forced sleeps once a quota is exhausted. If keeping the app warm exhausts the quota sooner, the ping made things worse, so measure.
 - **Schedulers have their own gaps.** cron on a laptop stops when the lid closes; GitHub schedules drift; hosted monitors have outages. For meaningful availability numbers use a dedicated monitoring service with an SLA.
 - **Why no self-ping.** `setInterval`/`node-cron` inside the server dies with the process it is supposed to keep alive, cannot fire while the host is asleep, and only proves the process can reach itself. It also runs once per replica, multiplying traffic. External scheduling has none of these problems.

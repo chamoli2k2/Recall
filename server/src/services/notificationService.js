@@ -6,7 +6,7 @@ import { Notification, User } from '../models/index.js';
  * stores a row, one pushes over the socket, another could send email later.
  *
  * Channels run in registration order so a later channel can reuse what an earlier one produced,
- * and a throwing channel is logged rather than propagated — a failed notification must never roll
+ * and a throwing channel is logged rather than propagated, because a failed notification must never roll
  * back the action that triggered it.
  */
 export class NotificationCenter {

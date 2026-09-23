@@ -182,7 +182,7 @@ export async function removeMember(actor, id, userId) {
 
 // --- Folders and assignments ---------------------------------------------
 
-/** A team folder belongs to the team, so the roster — not an invite list — decides who can open it. */
+/** A team folder belongs to the team, so the roster decides who can open it, not an invite list. */
 export async function createTeamFolder(user, id, body) {
   const { team } = await accessTeam(id, user, 'teacher');
   assert(teamActive(team), 402, 'Buy seats before adding team folders.', 'TEAM_INACTIVE');
@@ -223,7 +223,7 @@ export async function archiveAssignment(user, id, assignmentId) {
 
 /**
  * The teacher's view of the class. Everyone keeps their own study progress, so this reads the same
- * per-user Progress and Review rows the learner sees — it does not shadow-copy anything.
+ * per-user Progress and Review rows the learner sees, and it shadow-copies nothing.
  */
 export async function teamProgress(user, id, folderId) {
   const { team } = await accessTeam(id, user, 'progress');

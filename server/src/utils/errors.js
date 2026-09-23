@@ -41,11 +41,11 @@ export function toAppError(err) {
   if (err instanceof AppError) return err;
   if (!err || typeof err !== 'object') return internal(undefined, undefined, { cause: err });
 
-  // Zod — request bodies, query strings, and webhook payloads.
+  // Zod: request bodies, query strings, and webhook payloads.
   if (err.name === 'ZodError' && Array.isArray(err.issues)) {
     return new AppError(400, zodMessage(err.issues), 'VALIDATION_FAILED', { cause: err, details: { field: first(err.issues)?.path?.join('.') || null } });
   }
-  // Mongo duplicate key — the unique indexes that enforce usernames, memberships, and idempotency.
+  // Mongo duplicate key: the unique indexes that enforce usernames, memberships, and idempotency.
   if (err.code === 11000) {
     const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || null;
     return new AppError(409, 'That record already exists.', 'DUPLICATE', { cause: err, details: { field } });
@@ -58,7 +58,7 @@ export function toAppError(err) {
   if (err.name === 'VersionError') return new AppError(409, 'Someone else changed this first. Reload and try again.', 'STALE_VERSION', { cause: err });
   if (err.name === 'MongoNetworkError' || err.name === 'MongooseServerSelectionError') return new AppError(503, 'The database is unavailable. Please try again shortly.', 'DB_UNAVAILABLE', { cause: err });
 
-  // Multer — uploads.
+  // Multer: uploads.
   if (err.code === 'LIMIT_FILE_SIZE') return new AppError(413, 'That file is too large.', 'FILE_TOO_LARGE', { cause: err });
   if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') return new AppError(400, 'Upload a single file.', 'BAD_UPLOAD', { cause: err });
 

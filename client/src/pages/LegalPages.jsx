@@ -1,19 +1,20 @@
 import { Link } from 'react-router-dom';
 import { Mail, ReceiptIndianRupee, ShieldAlert, MapPin, Clock3, MessageCircleQuestion, ArrowRight } from 'lucide-react';
+import { BRAND } from '../../../shared/brand.js';
 
-/** Everything an operator has to change before launch lives here, so the prose below never has to be
- *  hunted through. These pages are a solid starting point, not legal advice: have a lawyer read them
- *  against the jurisdiction you actually operate in. */
+/** Names and addresses come from the one brand config, so renaming the product rewrites these pages
+ *  too. The pages are a solid starting point, not legal advice: have a lawyer read them against the
+ *  jurisdiction you actually operate in. */
 const COMPANY = {
-  name: 'Recall',
-  legalName: 'Recall Learning',
-  email: 'hello@recall.app',
-  billing: 'billing@recall.app',
-  privacy: 'privacy@recall.app',
-  security: 'security@recall.app',
-  city: 'Bengaluru',
-  country: 'India',
-  updated: '23 September 2026',
+  name: BRAND.name,
+  legalName: BRAND.legalName,
+  email: BRAND.email.general,
+  billing: BRAND.email.billing,
+  privacy: BRAND.email.privacy,
+  security: BRAND.email.security,
+  city: BRAND.city,
+  country: BRAND.country,
+  updated: BRAND.policyUpdated,
 };
 
 function LegalPage({ eyebrow, title, lede, sections }) {
@@ -110,13 +111,13 @@ const termsSections = [
       <p>We would rather refund you than keep money you are not happy about. This section is the whole policy.</p>
       <h3>When you can get your money back</h3>
       <ul>
-        <li><strong>Personal Premium plans</strong> — a full refund within <strong>7 days</strong> of payment, for any reason at all. You do not have to justify it.</li>
-        <li><strong>Lifetime</strong> — a full refund within <strong>14 days</strong>, since it is a larger decision.</li>
-        <li><strong>Classroom and team plans</strong> — a full refund within <strong>7 days</strong>, as long as no more than two people besides the owner have taken a seat. After a class has genuinely started, we can only refund unclaimed seats.</li>
-        <li><strong>Extra seats</strong> bought part-way through a period — refundable within 7 days while they are still unclaimed.</li>
-        <li><strong>Something went wrong on our side</strong> — if a feature you paid for was unavailable for a meaningful stretch and we could not fix it, tell us and we will refund or extend your plan, whichever you prefer. This is not limited to 7 days.</li>
-        <li><strong>Paid twice, or paid by mistake</strong> — refunded in full whenever you notice, with no time limit.</li>
-        <li><strong>Payment never confirmed</strong> — if a UPI transfer is rejected at review, or a gateway payment fails after the money left your account, you get it all back automatically. You do not need to ask.</li>
+        <li><strong>Personal Premium plans:</strong> a full refund within <strong>7 days</strong> of payment, for any reason at all. You do not have to justify it.</li>
+        <li><strong>Lifetime:</strong> a full refund within <strong>14 days</strong>, since it is a larger decision.</li>
+        <li><strong>Classroom and team plans:</strong> a full refund within <strong>7 days</strong>, as long as no more than two people besides the owner have taken a seat. Once a class is properly under way, we can only refund the seats nobody has claimed.</li>
+        <li><strong>Extra seats</strong> bought part-way through a period stay refundable for 7 days, while they are still unclaimed.</li>
+        <li><strong>Something went wrong on our side:</strong> if a feature you paid for was unavailable for a meaningful stretch and we could not fix it, tell us and we will refund or extend your plan, whichever you prefer. This is not limited to 7 days.</li>
+        <li><strong>Paid twice, or paid by mistake:</strong> refunded in full whenever you notice, with no time limit.</li>
+        <li><strong>Payment never confirmed:</strong> if a UPI transfer is rejected at review, or a gateway payment fails after the money left your account, you get it all back automatically. You do not need to ask.</li>
       </ul>
       <h3>When we cannot refund</h3>
       <ul>
@@ -176,15 +177,15 @@ const privacySections = [
     id: 'collect', title: 'What we collect', body: <>
       <h3>Things you give us</h3>
       <ul>
-        <li><strong>Your account</strong> — name, username, email address, and a password that we store only as a bcrypt hash, never as text we could read. A profile picture and bio are optional.</li>
-        <li><strong>Your content</strong> — the folders, cards, tags, hints, and images you create or upload. Images are converted to WebP and resized when you upload them.</li>
-        <li><strong>Billing details</strong> — if you buy a plan, the name, email, and phone number you type at checkout, plus a record of the order. For a manual UPI transfer, the screenshot you upload as proof. <strong>Card and UPI credentials never reach our servers</strong>; the payment gateway handles those directly.</li>
-        <li><strong>Anything you write to us</strong> — support emails and the messages in them.</li>
+        <li><strong>Your account:</strong> name, username, email address, and a password that we store only as a bcrypt hash, never as text we could read. A profile picture and bio are optional.</li>
+        <li><strong>Your content:</strong> the folders, cards, tags, hints, and images you create or upload. Images are converted to WebP and resized when you upload them.</li>
+        <li><strong>Billing details:</strong> if you buy a plan, the name, email, and phone number you type at checkout, plus a record of the order. For a manual UPI transfer, the screenshot you upload as proof. <strong>Card and UPI credentials never reach our servers</strong>; the payment gateway handles those directly.</li>
+        <li><strong>Anything you write to us:</strong> support emails and the messages in them.</li>
       </ul>
       <h3>Things the service produces</h3>
       <ul>
-        <li><strong>Study history</strong> — which cards you reviewed, how you rated them, and when. This is what the scheduling algorithm runs on; without it spaced repetition cannot work.</li>
-        <li><strong>Technical logs</strong> — IP address, browser user-agent, and timestamps, kept briefly so we can find faults and spot abuse. Errors are recorded with a request identifier so we can trace a single failure without trawling through your content.</li>
+        <li><strong>Study history:</strong> which cards you reviewed, how you rated them, and when. This is what the scheduling algorithm runs on; without it spaced repetition cannot work.</li>
+        <li><strong>Technical logs:</strong> IP address, browser user-agent, and timestamps, kept briefly so we can find faults and spot abuse. Errors are recorded with a request identifier so we can trace a single failure without trawling through your content.</li>
       </ul>
     </>,
   },
@@ -202,7 +203,7 @@ const privacySections = [
     id: 'why', title: 'Why we hold it', body: <>
       <p>Each thing we store has a job to do:</p>
       <ul>
-        <li>to give you the service you signed up for — your account, your content, your schedule;</li>
+        <li>to give you the service you signed up for: your account, your content, and your schedule;</li>
         <li>to take payment and keep the records that tax law requires us to keep;</li>
         <li>to keep the service secure, to investigate abuse, and to fix faults;</li>
         <li>to reply when you contact us;</li>
@@ -221,9 +222,9 @@ const privacySections = [
     id: 'processors', title: 'Who else touches your data', body: <>
       <p>We use a small number of suppliers to run the service. Each one receives only what it needs, and none of them may use your data for their own purposes:</p>
       <ul>
-        <li><strong>Hosting and database providers</strong> — they store the application and its data.</li>
-        <li><strong>Our payment gateway</strong> — it processes card and UPI payments and returns a confirmation. It handles your payment credentials so that we never have to.</li>
-        <li><strong>Email delivery</strong> — for account and transactional messages.</li>
+        <li><strong>Hosting and database providers:</strong> they store the application and its data.</li>
+        <li><strong>Our payment gateway:</strong> it processes card and UPI payments and returns a confirmation. It handles your payment credentials so that we never have to.</li>
+        <li><strong>Email delivery:</strong> for account and transactional messages.</li>
       </ul>
       <p>We will also disclose data where a valid legal order requires it, and we will tell you when we are permitted to.</p>
     </>,
@@ -251,12 +252,12 @@ const privacySections = [
     id: 'rights', title: 'Your rights', body: <>
       <p>Whatever country you are in, we will honour these:</p>
       <ul>
-        <li><strong>See it</strong> — ask for a copy of the personal data we hold about you.</li>
-        <li><strong>Take it</strong> — export your collections to JSON or CSV, or ask us for an export.</li>
-        <li><strong>Fix it</strong> — correct anything inaccurate, most of it yourself in Settings.</li>
-        <li><strong>Delete it</strong> — have your account and content removed, as described above.</li>
-        <li><strong>Object</strong> — tell us to stop a particular use of your data.</li>
-        <li><strong>Complain</strong> — raise it with your local data protection authority. We would appreciate the chance to put it right first.</li>
+        <li><strong>See it:</strong> ask for a copy of the personal data we hold about you.</li>
+        <li><strong>Take it:</strong> export your collections to JSON or CSV, or ask us for an export.</li>
+        <li><strong>Fix it:</strong> correct anything inaccurate, most of it yourself in Settings.</li>
+        <li><strong>Delete it:</strong> have your account and content removed, as described above.</li>
+        <li><strong>Object:</strong> tell us to stop a particular use of your data.</li>
+        <li><strong>Complain:</strong> raise it with your local data protection authority. We would appreciate the chance to put it right first.</li>
       </ul>
       <p>Write to {COMPANY.privacy}. We answer within 30 days and we do not charge for it.</p>
     </>,
@@ -298,7 +299,7 @@ export function PrivacyPage() {
 }
 
 const CONTACT_CARDS = [
-  { icon: Mail, title: 'General questions', text: 'Anything about using Recall, a feature you cannot find, or an idea you would like us to build.', to: COMPANY.email },
+  { icon: Mail, title: 'General questions', text: `Anything about using ${COMPANY.name}, a feature you cannot find, or an idea you would like us to build.`, to: COMPANY.email },
   { icon: ReceiptIndianRupee, title: 'Billing and refunds', text: 'Plans, invoices, seats, and refund requests. Include the order reference from Settings → Premium.', to: COMPANY.billing },
   { icon: ShieldAlert, title: 'Privacy and security', text: 'Data requests, account deletion, and vulnerability reports. We will not pursue good-faith research.', to: COMPANY.privacy },
 ];

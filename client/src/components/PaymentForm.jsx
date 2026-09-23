@@ -6,6 +6,7 @@ import { messageFor, ApiError } from '../services/errors';
 import { loadCheckout } from '../services/razorpay';
 import { useApp } from '../hooks/useApp';
 import { Button, Field, ErrorState } from './ui';
+import { BRAND } from '../../../shared/brand.js';
 
 const METHOD_ICONS = { razorpay: Zap, manual: Banknote };
 const money = n => `₹${(n || 0).toLocaleString('en-IN')}`;
@@ -58,7 +59,7 @@ export default function PaymentForm({ methods = [], amount, summary, label = 'Su
     await new Promise((resolve, reject) => {
       const rz = new Razorpay({
         key: checkout.key, order_id: checkout.orderId, amount: checkout.amount, currency: checkout.currency,
-        name: 'Recall', description: checkout.description, prefill: checkout.prefill, theme: { color: '#5b53e8' },
+        name: BRAND.name, description: checkout.description, prefill: checkout.prefill, theme: { color: '#5b53e8' },
         handler: response => api('/premium/checkout/confirm', {
           method: 'POST',
           body: { orderId: response.razorpay_order_id, paymentId: response.razorpay_payment_id, signature: response.razorpay_signature },
@@ -108,6 +109,6 @@ export default function PaymentForm({ methods = [], amount, summary, label = 'Su
     </>}
     {error && <ErrorState message={error}/>}
     <Button className="primary premium-submit" loading={busy} type="submit"><Crown size={16}/> {active?.instant ? instantLabel : label}{amount ? ` · ${money(amount)}` : ''}</Button>
-    <p className="premium-fineprint"><ShieldCheck size={14}/> {active?.requiresProof ? 'Your screenshot is private. Only you and an admin can open it.' : 'Card details go straight to the payment gateway. Recall never sees them.'}</p>
+    <p className="premium-fineprint"><ShieldCheck size={14}/> {active?.requiresProof ? 'Your screenshot is private. Only you and an admin can open it.' : `Card details go straight to the payment gateway. ${BRAND.name} never sees them.`}</p>
   </form>;
 }

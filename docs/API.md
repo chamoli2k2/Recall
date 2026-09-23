@@ -45,7 +45,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | GET | `/stats` | Own study statistics: totals, `retention { desired, predicted, observed, sampled, averageStability }`, 14-day `forecast`, memory `states`, `hardest` cards, one-year daily `heatmap`, `streak { current, longest, activeDays }`, `insights[]`, 30-day `ratingMix` |
 | GET | `/notifications` | Own 30 most recent notifications plus `unread` count. Types: `follow`, `connect.request`, `connect.accepted`, `premium.requested`, `premium.approved`, `premium.declined` |
 | POST | `/notifications/read` | `{ ids?: string[] }`. Omit `ids` to mark everything read. Returns the new `unread` count |
-| GET | `/premium/order` | `{ order, subscription, methods }`. `subscription` carries `plan`, `expiresAt`, `daysLeft`, `active`. `methods` lists only what this server can actually take money with, each `{ id, label, blurb, instant, requiresProof }` — the checkout page renders whatever is returned |
+| GET | `/premium/order` | `{ order, subscription, methods }`. `subscription` carries `plan`, `expiresAt`, `daysLeft`, `active`. `methods` lists only what this server can actually take money with, each `{ id, label, blurb, instant, requiresProof }`. The checkout page renders whatever is returned |
 | POST | `/premium/order` | Manual flow. Multipart: `plan` (monthly\|quarterly\|yearly\|lifetime), name, email, phone, country, address, and required `proof` image (UPI screenshot). Stays `pending` until an admin approves it |
 | POST | `/premium/checkout` | Gateway flow, step one. Same JSON fields plus `method: razorpay`. Reserves a Razorpay order and returns `{ order, checkout }` for the browser SDK. 502 `GATEWAY_UNREACHABLE`/`GATEWAY_REJECTED` if the gateway declines, and the pending order is removed so the buyer can retry |
 | POST | `/premium/checkout/confirm` | Gateway flow, step two. `{ orderId, paymentId, signature }` from the checkout callback. The signature is verified against `RAZORPAY_KEY_SECRET` before anything is granted; a mismatch is 400 `BAD_SIGNATURE` |
@@ -55,7 +55,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 | GET / POST | `/teams` | Own teams with `role`, `seats`, `memberCount`, `daysLeft`, `active`. POST takes `{ name, kind: classroom\|team, description }` and creates it unpaid with no seats |
 | GET | `/teams/:id` | `{ team, members, folders, assignments }`. Only for members; a team you are not in is a 404 |
 | PATCH / PATCH | `/teams/:id`, `/teams/:id/archive` | Owner only. Update takes `version` for optimistic concurrency; archiving keeps the folders and study history |
-| GET | `/teams/code/:code` | What a join code leads to — team name, kind, and the role it grants. Nothing else is revealed before the seat is taken |
+| GET | `/teams/code/:code` | What a join code leads to: team name, kind, and the role it grants. Nothing else is revealed before the seat is taken |
 | POST | `/teams/join` | `{ code }`. Takes a seat in one transaction; 400 `NO_SEATS` when the team is full, `TEAM_INACTIVE` when unpaid, `ALREADY_MEMBER` when already in |
 | GET / POST | `/teams/:id/invites` | Teacher or owner. POST returns the plaintext `code` **once**; only a SHA-256 hash is stored. Optional `role`, `maxUses`, `expiresInDays` |
 | DELETE | `/teams/:id/invites/:inviteId` | Revoke an unused link |

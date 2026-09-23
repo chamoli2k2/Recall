@@ -6,7 +6,7 @@ import { assert } from '../utils/errors.js';
 const publicUser = u => ({ id: u.id, username: u.username, name: u.name, bio: u.bio || '', followers: u.followers || 0, following: u.following || 0, friends: u.friends || 0 });
 const escapeRe = q => String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Derive viewer buttons from at most three relationship rows. Pure — no database. */
+/** Derive viewer buttons from at most three relationship rows. Pure, with no database access. */
 export function flagsFromRows(me, them, rows) {
   const mine = String(me), theirs = String(them);
   const following = rows.some(r => r.kind === 'follow' && String(r.from) === mine && String(r.to) === theirs && r.status === 'active');

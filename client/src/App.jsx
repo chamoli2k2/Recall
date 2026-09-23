@@ -16,9 +16,10 @@ import PremiumPage from './pages/PremiumPage';
 import DashboardPage from './pages/DashboardPage';
 import { TeamsPage, TeamPage, TeamCheckoutPage, TeamProgressPage, TeamJoinLinkPage } from './pages/TeamPages';
 import { hasDashboard } from '../../shared/account.js';
+import { BRAND } from '../../shared/brand.js';
 export default function App() {
   const { user, loading } = useApp();
-  if (loading) return <div className="boot-screen"><img src="/favicon.svg" alt="Recall"/><Loading/></div>;
+  if (loading) return <div className="boot-screen"><img src="/favicon.svg" alt={BRAND.name}/><Loading/></div>;
   if (!user) return <Routes>
     <Route path="/" element={<PublicShell wide><HomePage/></PublicShell>}/>
     <Route path="/login" element={<AuthPage/>}/><Route path="/signup" element={<AuthPage mode="signup"/>}/>

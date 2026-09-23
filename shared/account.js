@@ -1,3 +1,4 @@
+import { BRAND } from './brand.js';
 export const ACCOUNTS = ['normal', 'premium', 'admin', 'superadmin'];
 const DAY = 86400000;
 
@@ -5,7 +6,7 @@ const DAY = 86400000;
 export const PREMIUM_PLANS = [
   { id: 'monthly', label: 'Monthly', days: 30, price: 199, blurb: 'Try the full toolkit for a month.' },
   { id: 'quarterly', label: 'Quarterly', days: 90, price: 499, blurb: 'Three months for the price of two and a half.' },
-  { id: 'yearly', label: 'Yearly', days: 365, price: 1499, blurb: 'The best value if Recall is part of your routine.' },
+  { id: 'yearly', label: 'Yearly', days: 365, price: 1499, blurb: `The best value if ${BRAND.name} is part of your routine.` },
   { id: 'lifetime', label: 'Lifetime', days: null, price: 3999, blurb: 'Pay once. Every Premium feature, forever.' },
 ];
 export const PLAN_IDS = PREMIUM_PLANS.map(p => p.id);

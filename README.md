@@ -46,7 +46,7 @@ Social graph is a single `relationships` collection: unique `(from, to, kind)` w
 | Double-submitted review | Client UUID `requestId`. Unique `(user, requestId)`. Retry returns the stored result; same key, different payload → 409 | `studyService.reviewCard` |
 | Duplicate usernames / progress / revisions | Unique indexes are the source of truth. No check-then-insert. `E11000` → 409 | `models/index.js` |
 
-`writeEpoch` exists because snapshot isolation would otherwise let two transactions that write *different* cards both commit after reading the same folder — including a write that started before the owner revoked access.
+`writeEpoch` exists because snapshot isolation would otherwise let two transactions that write *different* cards both commit after reading the same folder, including a write that started before the owner revoked access.
 
 Authorization is computed by `roleOf`: owner, editor, viewer (explicit or `visibility === 'global'`), or `null`. Outsiders get **404**, not 403. `accessFolder` is the only choke point and runs **inside the transaction** for writes. `/api/media/:id` uses the same check and `Cache-Control: private, no-store`.
 
@@ -78,10 +78,10 @@ Three layers. Sockets never mutate data.
 
 | Format | Sample file (download from the import dialog) |
 | --- | --- |
-| JSON | [`public/import-templates/dummy.json`](public/import-templates/dummy.json) — `{ "cards": [{ "front": { "text" }, "back": { "text" }, "tags", "hint", "source" }] }` |
-| CSV / TSV | [`public/import-templates/dummy.csv`](public/import-templates/dummy.csv) — header `front,back,tags,hint,source` (aliases like question/answer work) |
-| Markdown | [`public/import-templates/dummy.md`](public/import-templates/dummy.md) — `Q:`/`A:` blocks, headings, `term :: definition` |
-| Anki text | [`public/import-templates/dummy.txt`](public/import-templates/dummy.txt) — `#separator:tab` plus tab-separated fields |
+| JSON | [`public/import-templates/dummy.json`](public/import-templates/dummy.json): `{ "cards": [{ "front": { "text" }, "back": { "text" }, "tags", "hint", "source" }] }` |
+| CSV / TSV | [`public/import-templates/dummy.csv`](public/import-templates/dummy.csv): header `front,back,tags,hint,source` (aliases like question/answer work) |
+| Markdown | [`public/import-templates/dummy.md`](public/import-templates/dummy.md): `Q:`/`A:` blocks, headings, `term :: definition` |
+| Anki text | [`public/import-templates/dummy.txt`](public/import-templates/dummy.txt): `#separator:tab` plus tab-separated fields |
 
 `.apkg` is a zip + SQLite collection (`sql.js`). Export is `GET /folders/:id/export` (JSON) or `?format=csv`.
 
@@ -103,7 +103,7 @@ Owner invites by username (`viewer` or `editor`). `visibility: global` makes the
 
 ### Error handling
 
-One classifier decides what every failure means. `toAppError` turns anything thrown anywhere — a Zod issue, a Mongo duplicate key or `CastError`, a Multer limit, a malformed JSON body, or a plain bug — into an `AppError` carrying an HTTP status, a stable machine-readable `code`, and an `expose` flag. Express, Socket.IO, and the process-level handlers all funnel through it, so a validation failure looks the same whether it arrived over HTTP or a socket.
+One classifier decides what every failure means. `toAppError` turns anything thrown anywhere, whether that is a Zod issue, a Mongo duplicate key or `CastError`, a Multer limit, a malformed JSON body, or a plain bug, into an `AppError` carrying an HTTP status, a stable machine-readable `code`, and an `expose` flag. Express, Socket.IO, and the process-level handlers all funnel through it, so a validation failure looks the same whether it arrived over HTTP or a socket.
 
 `expose` is the security boundary: anything that is not deliberately thrown is treated as a bug, logged with its stack, and answered with a generic message, so a connection string in a driver error can never reach a client. Every request gets an id (reused from `X-Request-Id` when the caller supplies a safe one), returned in both the response header and the error body, and carried through services in an `AsyncLocalStorage` so a log line written deep in a service can be tied back to what the user saw. Clients raise a matching `ApiError` with the same status, code, and request id; `reportError` is the single place a failure becomes a toast, and a React error boundary keeps a render crash from blanking the app.
 
@@ -112,7 +112,7 @@ One classifier decides what every failure means. `toAppError` turns anything thr
 An **observer** sits between the things that happen and the ways people hear about them. A producer calls `notify(recipient, type, { actor, data })` and knows nothing beyond that; `NotificationCenter` walks its subscribed channels in registration order:
 
 1. `persistChannel` writes a `Notification` row and hangs it on the event, so the inbox survives a reload.
-2. `realtimeChannel` (registered by the realtime layer, which is why the service has no socket dependency) emits to `user:<id>` — a room every authenticated socket joins on connect, so all of a person's tabs light up at once.
+2. `realtimeChannel` (registered by the realtime layer, which is why the service has no socket dependency) emits to `user:<id>`, a room every authenticated socket joins on connect, so all of a person's tabs light up at once.
 
 A channel that throws is logged and skipped rather than propagated: a failed notification must never roll back the follow or the approval that triggered it. Adding email later means subscribing one more function. Producers today are follow, connection request, connection accepted, and the three premium transitions; `notifyStaff` fans a new payment request out to every admin. `GET /api/notifications` returns the 30 most recent plus an unread count, and opening the bell is the read receipt.
 
@@ -124,15 +124,15 @@ Plans live in `shared/account.js` (`monthly`, `quarterly`, `yearly`, `lifetime`)
 
 Two ways to pay sit side by side, and the buyer chooses. `server/src/services/payments/index.js` describes each method once and advertises only the ones this server can actually use: the online option appears when `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are set, the UPI-transfer option appears unless `MANUAL_PAYMENT=off`. The checkout page renders whatever that list contains, so retiring the manual flow is an environment change rather than a UI deploy.
 
-Both routes converge on `fulfilOrder`, the only code that applies a plan. It flips the status with a conditional update on `{ _id, status: 'pending' }`, and the order collection has sparse unique indexes on the gateway order and payment ids. Between them, a webhook retry, a duplicate delivery, and a browser callback racing the webhook can only ever grant the plan once — the loser gets `alreadySettled` and nobody gains extra days.
+Both routes converge on `fulfilOrder`, the only code that applies a plan. It flips the status with a conditional update on `{ _id, status: 'pending' }`, and the order collection has sparse unique indexes on the gateway order and payment ids. Between them, a webhook retry, a duplicate delivery, and a browser callback racing the webhook can only ever grant the plan once. The loser gets `alreadySettled` and nobody gains extra days.
 
-The gateway is spoken to over plain `fetch` rather than its SDK, so the trust boundary is small enough to read: an order is reserved server-side, the browser pays in Razorpay's own window, and nothing is granted until an HMAC-SHA256 signature verifies under `crypto.timingSafeEqual`. The webhook is the authoritative path, since a buyer who closes the tab after paying never sends the callback. Its route is mounted on `express.raw()` **before** the JSON parser, because the signature covers the exact bytes the gateway sent and a re-serialised body will not match — `server/test/payments.test.js` asserts exactly that.
+The gateway is spoken to over plain `fetch` rather than its SDK, so the trust boundary is small enough to read: an order is reserved server-side, the browser pays in Razorpay's own window, and nothing is granted until an HMAC-SHA256 signature verifies under `crypto.timingSafeEqual`. The webhook is the authoritative path, since a buyer who closes the tab after paying never sends the callback. Its route is mounted on `express.raw()` **before** the JSON parser, because the signature covers the exact bytes the gateway sent and a re-serialised body will not match. `server/test/payments.test.js` asserts exactly that.
 
 ### Classrooms and teams
 
 A team is a roster with paid seats. Plans are per seat (`shared/teams.js`), so the price follows the size of the group rather than a tier it has to grow into, and the owner can add seats later. A classroom and a study team are the same entity; `kind` only decides whether the roles read as teacher/student or manager/member.
 
-Taking a seat is one transaction. The membership row and the `memberCount` that guards the cap are written together, and the counter is only incremented while it is still below the paid seat count, so two students racing for the last chair cannot both get in — `server/test/integration.test.js` opens two simultaneous joins against a team with one seat free and asserts exactly one wins. Removing someone frees their seat immediately, so nobody is billed for an empty chair.
+Taking a seat is one transaction. The membership row and the `memberCount` that guards the cap are written together, and the counter is only incremented while it is still below the paid seat count, so two students racing for the last chair cannot both get in. `server/test/integration.test.js` opens two simultaneous joins against a team with one seat free and asserts exactly one wins. Removing someone frees their seat immediately, so nobody is billed for an empty chair.
 
 A seat unlocks the Premium toolkit **inside the team's own folders and nowhere else**. That is why the folder-scoped gates moved off the routes and into the folder layer: whether import, export, covers, editor invites, or quiz hosting are allowed depends on which folder is open, not on who is asking. `entitledOnFolder` is the one question they all ask, and the folder payload carries its answer as `premium` so the menu and the server agree. A student's personal library is unchanged by joining or leaving a class, and a lapsed team closes its own folders without anyone revoking anything.
 
@@ -152,9 +152,9 @@ Seats are sold through the order pipeline built for personal plans, which is why
 
 ### Tests
 
-- **Unit** (`npm test`) — FSRS, cloze, import parsers (including the dummy templates), bus, DocStore, RoomStore.
-- **Integration** (`npm run test:integration`) — replica-set transactions, Socket.IO, 409 vs 200 on concurrent writes, revocation ejects sockets.
-- **E2E** (`npm run test:e2e`) — Playwright: authoring, import/export, two-browser co-editing, a full quiz.
+- **Unit** (`npm test`): FSRS, cloze, import parsers (including the dummy templates), bus, DocStore, RoomStore.
+- **Integration** (`npm run test:integration`): replica-set transactions, Socket.IO, 409 vs 200 on concurrent writes, revocation ejects sockets.
+- **E2E** (`npm run test:e2e`): Playwright: authoring, import/export, two-browser co-editing, a full quiz.
 
 CI: `.github/workflows/ci.yml`.
 
