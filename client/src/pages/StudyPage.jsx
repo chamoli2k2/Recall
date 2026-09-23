@@ -2,13 +2,13 @@ import { uuid } from '../services/uuid';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { X, ArrowRight, RotateCcw, Lightbulb, Check, PartyPopper, ExternalLink, Shuffle } from 'lucide-react';
-import { useLoad, useApp } from '../hooks/useApp';
+import { useQuery, useApp } from '../hooks/useApp';
 import { api, imageUrl } from '../services/api';
 import { Button, Loading, ErrorState, Tag, FolderIcon, Empty } from '../components/ui';
 import RichText, { sideOf, plainText } from '../components/RichText';
 export default function StudyPage() {
   const { id } = useParams(); const [params] = useSearchParams(); const dueOnly = params.get('mode') === 'due'; const { refresh } = useApp();
-  const { data, loading, error } = useLoad(() => Promise.all([api(`/folders/${id}`), api(`/folders/${id}/cards`)]).then(([f, c]) => ({ ...f, cards: c.cards.filter(card => !dueOnly || !card.progress?.dueAt || new Date(card.progress.dueAt) <= new Date()) })), [id]);
+  const { data, loading, error } = useQuery(`study:${id}:${dueOnly ? 'due' : 'all'}`, () => Promise.all([api(`/folders/${id}`), api(`/folders/${id}/cards`)]).then(([f, c]) => ({ ...f, cards: c.cards.filter(card => !dueOnly || !card.progress?.dueAt || new Date(card.progress.dueAt) <= new Date()) })));
   const [queue, setQueue] = useState(null), [index, setIndex] = useState(0), [flipped, setFlipped] = useState(false), [hint, setHint] = useState(false), [busy, setBusy] = useState(false), [failure, setFailure] = useState(''), [ratings, setRatings] = useState([]); const pending = useRef(null), inFlight = useRef(false);
   useEffect(() => { if (data && !queue) setQueue(data.cards); }, [data, queue]);
   const card = queue?.[index]; const side = card && sideOf(card, flipped);

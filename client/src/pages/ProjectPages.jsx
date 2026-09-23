@@ -4,7 +4,7 @@ import { Plus, ArrowLeft, FolderPlus, Trash2, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { reportError } from '../services/errors';
-import { useApp, useLoad } from '../hooks/useApp';
+import { useApp, useQuery } from '../hooks/useApp';
 import { Button, Loading, ErrorState, Empty, Modal, Field } from '../components/ui';
 import FolderTile from '../components/FolderTile';
 import { hasPremium } from '../../../shared/account.js';
@@ -30,8 +30,8 @@ export function ProjectModal({ project, onClose }) {
   </Modal>;
 }
 export function ProjectsPage() {
-  const { revision, refresh, user } = useApp(); const navigate = useNavigate(); const [create, setCreate] = useState(false);
-  const { data, loading, error } = useLoad(() => hasPremium(user) ? api('/projects') : Promise.resolve({ projects: [] }), [revision, user?.account]);
+  const { refresh, user } = useApp(); const navigate = useNavigate(); const [create, setCreate] = useState(false);
+  const { data, loading, error } = useQuery('/projects', undefined, { enabled: hasPremium(user) });
   const projects = data?.projects || [];
   if (!hasPremium(user)) return <><div className="page-heading"><div><span className="eyebrow">PREMIUM</span><h1>Projects</h1><p>Group folders you already have. This is a Premium feature.</p></div></div><Empty title="Projects are Premium" text="Upgrade to create projects. Folders themselves stay free." action={<Button className="primary" onClick={() => navigate('/premium')}><Crown size={16}/> See Premium</Button>}/></>;
   return <>
@@ -41,9 +41,9 @@ export function ProjectsPage() {
   </>;
 }
 export function ProjectPage() {
-  const { id } = useParams(); const { revision, refresh } = useApp();
-  const { data, loading, error } = useLoad(() => api(`/projects/${id}`), [revision, id]);
-  const { data: lib } = useLoad(() => api('/folders'), [revision]);
+  const { id } = useParams(); const { refresh } = useApp();
+  const { data, loading, error } = useQuery(`/projects/${id}`);
+  const { data: lib } = useQuery('/folders');
   const [add, setAdd] = useState(false), [edit, setEdit] = useState(false);
   const project = data?.project;
   async function addFolder(folderId) { try { await api(`/projects/${id}/folders`, { method: 'POST', body: { folderId } }); refresh(); setAdd(false); toast.success('Folder added'); } catch (e) { reportError(e); } }

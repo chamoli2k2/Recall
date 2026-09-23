@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
 import { LibraryBig, Compass, Users, ChartNoAxesCombined, Plus, ArrowUpRight, Settings2, Menu as MenuIcon, Search, Archive, LogOut, Layers, Swords, FolderOpen, UserPlus, LayoutDashboard, Crown, GraduationCap } from 'lucide-react';
 import { Avatar, Button, Modal } from './ui';
-import { useApp, useLoad } from '../hooks/useApp';
+import { useApp, useQuery } from '../hooks/useApp';
 import { api } from '../services/api';
 import { reportError } from '../services/errors';
 import FolderModal from './FolderModal';
@@ -11,6 +11,7 @@ import NotificationBell from './NotificationBell';
 import SiteFooter from './SiteFooter';
 import { PremiumMark } from './PremiumMark';
 import { hasDashboard, hasPremium } from '../../../shared/account.js';
+import { BRAND } from '../../../shared/brand.js';
 const SIDEBAR = { min: 196, max: 400, default: 240, key: 'recall:sidebar' };
 const clampWidth = px => Math.min(SIDEBAR.max, Math.max(SIDEBAR.min, Math.round(px)));
 /** Width lives in a CSS variable so one drag moves the sidebar and the workspace together.
@@ -40,9 +41,9 @@ function useSidebarWidth() {
   return { width, drag, nudge, reset: () => setWidth(0) };
 }
 export default function Layout() {
-  const { user, isDemo, revision, setUser } = useApp(); const navigate = useNavigate();
+  const { user, isDemo, setUser } = useApp(); const navigate = useNavigate();
   const [create, setCreate] = useState(false), [mobile, setMobile] = useState(false), [help, setHelp] = useState(false), [query, setQuery] = useState(''), [people, setPeople] = useState([]);
-  const { data } = useLoad(() => api('/folders'), [revision]);
+  const { data } = useQuery('/folders');
   const sidebar = useSidebarWidth();
   const nav = [['/', LibraryBig, 'My library', false], ['/projects', FolderOpen, 'Projects', true], ['/teams', GraduationCap, 'Classrooms', false], ['/friends', UserPlus, 'Friends', false], ['/shared', Users, 'Shared with me', false], ['/explore', Compass, 'Explore', false], ['/progress', ChartNoAxesCombined, 'My progress', false], ...(isDemo ? [] : [['/rooms', Swords, 'Live quiz', true]]), ...(hasDashboard(user) ? [['/dashboard', LayoutDashboard, 'Dashboard', false]] : [])];
   async function signOut() {
@@ -57,7 +58,7 @@ export default function Layout() {
   return <div className="app-shell">
     {mobile && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobile(false)}/>}
     <aside className={`sidebar ${mobile ? 'open' : ''}`}>
-      <Link className="brand" to="/" onClick={() => setMobile(false)}><img src="/favicon.svg" alt=""/>recall<span className="brand-period">.</span></Link>
+      <Link className="brand" to="/" onClick={() => setMobile(false)}><img src="/favicon.svg" alt=""/>{BRAND.wordmark}<span className="brand-period">.</span></Link>
       <Button className="primary sidebar-create" onClick={() => setCreate(true)}><Plus size={19}/> Create a folder</Button>
       <div className="sidebar-scroll">
       <div className="nav-caption">WORKSPACE</div>
@@ -74,6 +75,6 @@ export default function Layout() {
       <main className="main-content"><Outlet/></main><SiteFooter/>
     </div>
     {create && <FolderModal onClose={() => setCreate(false)}/>}
-    <Modal open={help} onClose={() => setHelp(false)} title="Make room for a little learning" description="A small routine is easier to keep."><div className="help-copy"><p>Choose a daily goal you can comfortably finish. Start with a short review, try to recall the answer, then flip the card.</p><p>Rate each answer honestly. Recall will bring difficult cards back sooner and give familiar cards more space.</p><Button className="primary" onClick={() => { setHelp(false); navigate('/settings'); }}>Set your daily goal <ArrowUpRight size={17}/></Button></div></Modal>
+    <Modal open={help} onClose={() => setHelp(false)} title="Make room for a little learning" description="A small routine is easier to keep."><div className="help-copy"><p>Choose a daily goal you can comfortably finish. Start with a short review, try to recall the answer, then flip the card.</p><p>Rate each answer honestly. {BRAND.name} will bring difficult cards back sooner and give familiar cards more space.</p><Button className="primary" onClick={() => { setHelp(false); navigate('/settings'); }}>Set your daily goal <ArrowUpRight size={17}/></Button></div></Modal>
   </div>;
 }

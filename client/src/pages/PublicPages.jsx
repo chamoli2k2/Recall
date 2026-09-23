@@ -3,11 +3,12 @@ import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-ro
 import { ArrowLeft, ArrowRight, Globe2, RotateCcw, LogIn, Search } from 'lucide-react';
 import { api, imageUrl } from '../services/api';
 import { reportError } from '../services/errors';
-import { useApp, useLoad } from '../hooks/useApp';
+import { useApp, useQuery } from '../hooks/useApp';
 import { Avatar, FolderIcon, Loading, ErrorState, Tag, Empty, Button } from '../components/ui';
 import ThemeToggle from '../components/ThemeToggle';
 import SiteFooter from '../components/SiteFooter';
 import RichText, { sideOf, plainText } from '../components/RichText';
+import { BRAND } from '../../../shared/brand.js';
 function matchesFolder(folder, query) {
   if (!query) return true;
   const hay = `${folder.title} ${folder.description} ${folder.tags?.join(' ') || ''} ${folder.owner?.username || ''}`.toLowerCase();
@@ -16,7 +17,7 @@ function matchesFolder(folder, query) {
 export function PublicShell({ children, wide }) {
   const navigate = useNavigate(); const [params] = useSearchParams(); const [query, setQuery] = useState(params.get('q') || '');
   return <div className={`public-page ${wide ? 'public-page-wide' : ''}`}>
-    <header className="public-header"><Link className="brand" to="/"><img src="/favicon.svg" alt=""/>recall<span className="brand-period">.</span></Link>
+    <header className="public-header"><Link className="brand" to="/"><img src="/favicon.svg" alt=""/>{BRAND.wordmark}<span className="brand-period">.</span></Link>
       <nav className="public-nav" aria-label="Main"><NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>Home</NavLink><NavLink to="/explore" className={({ isActive }) => isActive ? 'active' : ''}>Explore</NavLink></nav>
       <form className="public-search folder-search" onSubmit={e => { e.preventDefault(); navigate(query.trim() ? `/?q=${encodeURIComponent(query.trim())}#library` : '/#library'); }}><Search size={16}/><input aria-label="Search public collections" placeholder="Search collections…" value={query} onChange={e => setQuery(e.target.value)}/></form>
       <div className="public-header-actions"><ThemeToggle/><Link className="button secondary public-signin" to="/login"><LogIn size={16}/> Sign in</Link><Link className="button primary" to="/signup">Get started <ArrowRight size={16}/></Link></div></header>
@@ -25,13 +26,13 @@ export function PublicShell({ children, wide }) {
   </div>;
 }
 export function PublicFolderPage() {
-  const { id } = useParams(); const { data, loading, error } = useLoad(() => Promise.all([api(`/folders/${id}`), api(`/folders/${id}/cards`)]).then(([f, c]) => ({ ...f, ...c })), [id]); const [flipped, setFlipped] = useState({});
+  const { id } = useParams(); const { data, loading, error } = useQuery(`/folders/${id}`, () => Promise.all([api(`/folders/${id}`), api(`/folders/${id}/cards`)]).then(([f, c]) => ({ ...f, ...c }))); const [flipped, setFlipped] = useState({});
   if (loading) return <Loading/>; if (error) return <Empty title="This collection isn’t available" text="It may be private. Sign in with an invited account to open it." action={<Link className="button primary" to="/login">Sign in</Link>}/>;
   return <><Link to="/explore" className="back-link"><ArrowLeft size={16}/> Explore collections</Link><div className="page-heading"><div><span className="eyebrow">A PUBLIC COLLECTION</span><h1>{data.folder.title}</h1><p>{data.folder.description}</p><Link to={`/u/${data.folder.owner.username}`} className="text-button">by @{data.folder.owner.username}</Link></div><div className={`large-folder-icon ${data.folder.color}`}><FolderIcon name={data.folder.icon} size={32}/></div></div><div className="folder-study-strip public-study-strip"><div><span className="study-strip-icon"><Globe2 size={22}/></span><div><h3>Flip any card to study it right here.</h3><p>Sign in to save this collection, make a private copy, and track your progress.</p></div></div><div><Link className="button primary" to="/signup">Create a free account</Link><Link className="button secondary" to="/login">Sign in</Link></div></div><div className="flashcard-grid">{data.cards.map((card, i) => { const side = sideOf(card, flipped[card.id]); return <article className="flashcard-item" key={card.id}><div className="flashcard-top">{i + 1} · {flipped[card.id] ? 'ANSWER' : 'QUESTION'}</div><button className="card-content" aria-label={`Flip card ${i + 1}`} onClick={() => setFlipped(f => ({ ...f, [card.id]: !f[card.id] }))}>{side.image && <img src={imageUrl(side.image)} alt={plainText(side.text) || 'Flashcard image'}/>}<RichText text={side.text} cloze={side.cloze}/></button><div className="flashcard-footer"><div>{card.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}</div><RotateCcw size={14}/></div></article>; })}</div></>;
 }
 export function ProfilePage() {
-  const { username } = useParams(); const { user, revision, refresh } = useApp();
-  const { data, loading, error } = useLoad(() => api(`/users/${username}`), [username, revision]);
+  const { username } = useParams(); const { user, refresh } = useApp();
+  const { data, loading, error } = useQuery(`/users/${username}`);
   if (loading) return <Loading/>; if (error) return <ErrorState message={error}/>;
   const p = data.profile; const rel = p.relation || { following: false, friendship: user?.username === p.username ? 'self' : 'none' };
   async function act(path, method = 'POST') { try { await api(`/users/${p.username}/${path}`, { method }); refresh(); } catch (e) { reportError(e); } }
@@ -53,7 +54,7 @@ export function ProfilePage() {
 }
 export function PublicExplorePage() {
   const [params, setParams] = useSearchParams(); const query = params.get('q') || '';
-  const { data, loading, error } = useLoad(() => api('/folders?scope=explore'), []);
+  const { data, loading, error } = useQuery('/folders?scope=explore');
   if (loading) return <Loading/>; if (error) return <ErrorState message={error}/>;
   const folders = (data.folders || []).filter(f => matchesFolder(f, query));
   return <><div className="page-heading"><div><span className="eyebrow">THE COMMUNITY LIBRARY</span><h1>Follow your curiosity.</h1><p>Public collections from curious people. Search without signing in.</p></div></div>

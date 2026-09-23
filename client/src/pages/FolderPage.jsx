@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Play, Share2, LockKeyhole, Globe2, Search, Pencil, Tra
 import { toast } from 'sonner';
 import { api, imageUrl } from '../services/api';
 import { reportError } from '../services/errors';
-import { useApp, useLoad } from '../hooks/useApp';
+import { useApp, useQuery } from '../hooks/useApp';
 import { useFolderRealtime } from '../hooks/useRealtime';
 import { Button, Loading, ErrorState, Empty, FolderIcon, Avatar, Tag, Menu, Modal, Field } from '../components/ui';
 import CardEditor from '../components/CardEditor';
@@ -25,15 +25,17 @@ function QuizModal({ folder, cardCount, onClose }) {
   </Modal>;
 }
 export default function FolderPage() {
-  const { id } = useParams(); const { revision, refresh, user } = useApp(); const navigate = useNavigate();
-  const [tick, setTick] = useState(0), [query, setQuery] = useState(''), [tag, setTag] = useState('all'), [flipped, setFlipped] = useState({}), [editor, setEditor] = useState(null), [share, setShare] = useState(false), [editFolder, setEditFolder] = useState(false), [remove, setRemove] = useState(null), [activity, setActivity] = useState(false), [bookmarkFilter, setBookmarkFilter] = useState(false), [liveVersions, setLiveVersions] = useState({}), [importing, setImporting] = useState(false), [quiz, setQuiz] = useState(false);
-  const { data, error, loading } = useLoad(() => Promise.all([api(`/folders/${id}`), api(`/folders/${id}/cards`)]).then(([f, c]) => ({ ...f, ...c })), [id, revision, tick]);
+  const { id } = useParams(); const { refresh, user } = useApp();
+  const navigate = useNavigate();
+  const [query, setQuery] = useState(''), [tag, setTag] = useState('all'), [flipped, setFlipped] = useState({}), [editor, setEditor] = useState(null), [share, setShare] = useState(false), [editFolder, setEditFolder] = useState(false), [remove, setRemove] = useState(null), [activity, setActivity] = useState(false), [bookmarkFilter, setBookmarkFilter] = useState(false), [liveVersions, setLiveVersions] = useState({}), [importing, setImporting] = useState(false), [quiz, setQuiz] = useState(false);
+  // A socket event or the polling fallback reloads this one folder, not everything else on screen.
+  const { data, error, loading, refetch: reload } = useQuery(`/folders/${id}`, () => Promise.all([api(`/folders/${id}`), api(`/folders/${id}/cards`)]).then(([f, c]) => ({ ...f, ...c })));
   // Live layer: committed events arrive over the socket; polling only runs as a fallback while disconnected.
   const { presence, connected, setEditing } = useFolderRealtime(id, {
-    onEvent: e => { setTick(v => v + 1); if (e.type === 'card.updated' && e.version != null) setLiveVersions(v => ({ ...v, [e.aggregateId]: e.version })); if (e.actor?.id !== user?.id) toast(`${e.actor?.name || 'Someone'} ${describe(e.type)}`, { description: e.detail?.slice(0, 80), icon: <Radio size={15}/> }); },
+    onEvent: e => { reload(); if (e.type === 'card.updated' && e.version != null) setLiveVersions(v => ({ ...v, [e.aggregateId]: e.version })); if (e.actor?.id !== user?.id) toast(`${e.actor?.name || 'Someone'} ${describe(e.type)}`, { description: e.detail?.slice(0, 80), icon: <Radio size={15}/> }); },
     onRevoked: () => { toast.error('Your access to this folder was removed.'); navigate('/'); }
   });
-  useEffect(() => { if (connected) return; const timer = setInterval(() => { if (!document.hidden && !editor) setTick(v => v + 1); }, 15000); return () => clearInterval(timer); }, [editor, connected]);
+  useEffect(() => { if (connected) return; const timer = setInterval(() => { if (!document.hidden && !editor) reload(); }, 15000); return () => clearInterval(timer); }, [editor, connected, reload]);
   if (!data) return error ? <ErrorState message={error}/> : <Loading/>;
   const { folder, cards } = data; const canEdit = ['owner', 'editor'].includes(folder.role);
   // The server answers this per folder, because a team seat entitles its holder here and nowhere else.
@@ -51,4 +53,4 @@ export default function FolderPage() {
     <Modal open={!!remove} onClose={() => setRemove(null)} title="Delete this flashcard?" description="This removes the card and its version history. This action cannot be undone."><div className="modal-actions"><Button className="secondary" onClick={() => setRemove(null)}>Keep card</Button><Button className="danger-button" onClick={async () => { try { await api(`/cards/${remove.id}`, { method: 'DELETE' }); setRemove(null); refresh(); toast.success('Card deleted'); } catch (e) { reportError(e); } }}>Delete card</Button></div></Modal>
   </>;
 }
-function ActivityModal({ id, onClose }) { const { data, loading, error } = useLoad(() => api(`/folders/${id}/activity`), [id]); return <Modal open onClose={onClose} title="Folder activity" description="Recent changes by people in this folder.">{loading ? <Loading/> : error ? <ErrorState message={error}/> : !data.activity.length ? <Empty title="A fresh start" text="Changes to this collection will appear here."/> : <div className="activity-list">{data.activity.map(a => <div key={a.id}><Avatar user={a.actor} small/><div><strong>{a.actor?.name} <span>{a.action.replaceAll('.', ' ')}</span></strong><p>{a.detail}</p><small>{new Date(a.createdAt).toLocaleString()}</small></div></div>)}</div>}</Modal>; }
+function ActivityModal({ id, onClose }) { const { data, loading, error } = useQuery(`/folders/${id}/activity`); return <Modal open onClose={onClose} title="Folder activity" description="Recent changes by people in this folder.">{loading ? <Loading/> : error ? <ErrorState message={error}/> : !data.activity.length ? <Empty title="A fresh start" text="Changes to this collection will appear here."/> : <div className="activity-list">{data.activity.map(a => <div key={a.id}><Avatar user={a.actor} small/><div><strong>{a.actor?.name} <span>{a.action.replaceAll('.', ' ')}</span></strong><p>{a.detail}</p><small>{new Date(a.createdAt).toLocaleString()}</small></div></div>)}</div>}</Modal>; }

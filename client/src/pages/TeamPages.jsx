@@ -7,7 +7,7 @@ import {
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { reportError, messageFor } from '../services/errors';
-import { useApp, useLoad } from '../hooks/useApp';
+import { useApp, useQuery } from '../hooks/useApp';
 import { Button, Field, Modal, Loading, Empty, ErrorState, Avatar, FolderIcon, Menu } from '../components/ui';
 import FolderModal from '../components/FolderModal';
 import PaymentForm from '../components/PaymentForm';
@@ -27,8 +27,8 @@ function SeatPill({ team }) {
 }
 
 export function TeamsPage() {
-  const { revision, refresh } = useApp();
-  const { data, loading, error } = useLoad(() => api('/teams'), [revision]);
+  const { refresh } = useApp();
+  const { data, loading, error } = useQuery('/teams');
   const [creating, setCreating] = useState(false), [joining, setJoining] = useState(false);
   if (loading) return <Loading/>;
   if (error) return <ErrorState message={error}/>;
@@ -99,7 +99,7 @@ function JoinTeamModal({ onClose, onDone }) {
       <Field label="Invite code" hint="Eight letters and numbers.">
         <input autoFocus required minLength={6} maxLength={16} placeholder="ABCD2345" className="code-input" value={code} onChange={e => { setCode(e.target.value.toUpperCase()); setPeek(null); }}/>
       </Field>
-      {peek && <div className="inline-note"><strong>{peek.team.name}</strong> — you will join as a {peek.roleLabel.toLowerCase()}.</div>}
+      {peek && <div className="inline-note"><strong>{peek.team.name}</strong>. You will join as a {peek.roleLabel.toLowerCase()}.</div>}
       {error && <ErrorState message={error}/>}
       <div className="modal-actions"><Button type="button" className="secondary" onClick={onClose}>Cancel</Button><Button className="primary" loading={busy} type="submit">{peek ? 'Take my seat' : 'Look it up'} <ArrowUpRight size={16}/></Button></div>
     </form>
@@ -111,7 +111,7 @@ export function TeamJoinLinkPage() {
   const { code } = useParams();
   const navigate = useNavigate();
   const { refresh } = useApp();
-  const { data, loading, error } = useLoad(() => api(`/teams/code/${encodeURIComponent(code)}`), [code]);
+  const { data, loading, error } = useQuery(`/teams/code/${encodeURIComponent(code)}`);
   const [busy, setBusy] = useState(false), [failed, setFailed] = useState('');
   if (loading) return <Loading/>;
   if (error) return <Empty title="That invite is not open" text={error} action={<Link className="button primary" to="/teams">Your teams</Link>}/>;
@@ -124,7 +124,7 @@ export function TeamJoinLinkPage() {
   return <section className="join-invite">
     <span className="team-card-icon"><Icon size={24}/></span>
     <h1>{data.team.name}</h1>
-    <p>You have been invited as a {data.roleLabel.toLowerCase()}. Taking a seat unlocks the full toolkit inside this team's folders — your own library is unaffected.</p>
+    <p>You have been invited as a {data.roleLabel.toLowerCase()}. Taking a seat unlocks the full toolkit inside this team's folders. Your own library is not affected.</p>
     {failed && <ErrorState message={failed}/>}
     <div className="modal-actions"><Link className="button secondary" to="/teams">Not now</Link><Button className="primary" loading={busy} onClick={join}><LogIn size={16}/> Take my seat</Button></div>
   </section>;
@@ -133,8 +133,8 @@ export function TeamJoinLinkPage() {
 export function TeamPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, revision, refresh } = useApp();
-  const { data, loading, error } = useLoad(() => api(`/teams/${id}`), [id, revision]);
+  const { user, refresh } = useApp();
+  const { data, loading, error } = useQuery(`/teams/${id}`);
   const [inviting, setInviting] = useState(false), [buying, setBuying] = useState(false);
   const [addingFolder, setAddingFolder] = useState(false), [assigning, setAssigning] = useState(false);
   if (loading) return <Loading/>;
@@ -228,10 +228,10 @@ export function TeamPage() {
 function InviteModal({ teamId, kind, onClose }) {
   const [role, setRole] = useState('student'), [code, setCode] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const { data, loading } = useLoad(() => api(`/teams/${teamId}/invites`), [teamId, code]);
+  const { data, loading, refetch } = useQuery(`/teams/${teamId}/invites`);
   async function make() {
     setBusy(true); setError('');
-    try { const d = await api(`/teams/${teamId}/invites`, { method: 'POST', body: { role } }); setCode(d.code); }
+    try { const d = await api(`/teams/${teamId}/invites`, { method: 'POST', body: { role } }); setCode(d.code); refetch(); }
     catch (err) { setError(messageFor(err)); } finally { setBusy(false); }
   }
   const link = code ? `${location.origin}/teams/join/${code}` : '';
@@ -330,10 +330,10 @@ export function TeamCheckoutPage() {
   const plan = params.get('plan') || 'team-yearly';
   const seats = clampSeats(params.get('seats'));
   const [method, setMethod] = useState(null);
-  const { data, loading, error } = useLoad(() => Promise.all([
+  const { data, loading, error } = useQuery(`team-checkout:${id}:${plan}:${seats}`, () => Promise.all([
     api(`/teams/${id}/quote`, { method: 'POST', body: { plan, seats } }),
     api(`/teams/${id}/billing`),
-  ]).then(([quote, billing]) => ({ quote, ...billing })), [id, plan, seats]);
+  ]).then(([quote, billing]) => ({ quote, ...billing })));
   if (loading) return <Loading/>;
   if (error) return <ErrorState message={error}/>;
   const { quote, order, methods = [] } = data;
@@ -376,7 +376,7 @@ const SEAT_STEPS = {
 export function TeamProgressPage() {
   const { id } = useParams();
   const [folderId, setFolderId] = useState('');
-  const { data, loading, error } = useLoad(() => api(`/teams/${id}/progress${folderId ? `?folderId=${folderId}` : ''}`), [id, folderId]);
+  const { data, loading, error } = useQuery(`/teams/${id}/progress${folderId ? `?folderId=${folderId}` : ''}`);
   if (loading) return <Loading/>;
   if (error) return <ErrorState message={error}/>;
   const { team, folders, rows, totalCards } = data;
@@ -395,7 +395,7 @@ export function TeamProgressPage() {
           <td><div className="dash-person"><Avatar user={r} small/><span><strong>{r.name}</strong><span className="dash-muted">{r.roleLabel}</span></span></div></td>
           <td><div className="coverage"><span className="coverage-bar"><span style={{ width: `${r.coverage}%` }}/></span><span className="dash-muted">{r.studied}/{totalCards}</span></div></td>
           <td>{r.reviews}</td>
-          <td>{r.accuracy == null ? <span className="dash-muted">—</span> : <span className={`sub-pill ${r.accuracy >= 80 ? 'is-active' : r.accuracy >= 50 ? 'is-soon' : 'is-expired'}`}>{r.accuracy}%</span>}</td>
+          <td>{r.accuracy == null ? <span className="dash-muted">Not yet</span> : <span className={`sub-pill ${r.accuracy >= 80 ? 'is-active' : r.accuracy >= 50 ? 'is-soon' : 'is-expired'}`}>{r.accuracy}%</span>}</td>
           <td>{r.due ? r.due : <span className="dash-muted">0</span>}</td>
           <td><span className="dash-muted">{r.lastReviewedAt ? day(r.lastReviewedAt) : 'not yet'}</span></td>
         </tr>)}</tbody>

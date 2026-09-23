@@ -3,14 +3,14 @@ import { ImageOff, Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { reportError } from '../services/errors';
-import { useApp, useLoad } from '../hooks/useApp';
+import { useApp, useQuery } from '../hooks/useApp';
 import { Button, Loading, ErrorState, Empty, Modal } from '../components/ui';
 import { ACCOUNTS, isSuperadmin, planById } from '../../../shared/account.js';
-const when = iso => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const when = iso => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Never';
 const day = iso => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
 /** Reads the subscription window for one person in the users table. */
 function Subscription({ person }) {
-  if (!['premium', 'admin', 'superadmin'].includes(person.account)) return <span className="dash-muted">—</span>;
+  if (!['premium', 'admin', 'superadmin'].includes(person.account)) return <span className="dash-muted">Free</span>;
   if (!person.expiresAt) return <span className="sub-pill is-forever">{person.planLabel || 'No end date'}</span>;
   const left = person.daysLeft;
   const tone = left <= 0 ? 'is-expired' : left <= 7 ? 'is-soon' : 'is-active';
@@ -19,12 +19,12 @@ function Subscription({ person }) {
   </span>;
 }
 export default function DashboardPage() {
-  const { user, revision, refresh } = useApp();
+  const { user, refresh } = useApp();
   const [open, setOpen] = useState(null);
   const [tab, setTab] = useState('users');
   const [q, setQ] = useState('');
-  const { data, loading, error } = useLoad(() => api(`/admin/users${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`), [revision, q]);
-  const { data: orders, loading: lo, error: eo } = useLoad(() => api('/admin/orders'), [revision]);
+  const { data, loading, error } = useQuery(`/admin/users${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`);
+  const { data: orders, loading: lo, error: eo } = useQuery('/admin/orders');
   async function setAccount(id, account) {
     try { await api(`/admin/users/${id}`, { method: 'PATCH', body: { account } }); refresh(); toast.success('Role updated'); }
     catch (e) { reportError(e); }
@@ -46,7 +46,7 @@ export default function DashboardPage() {
     </div>
     {tab === 'users' && <>
       <form className="folder-search dash-search" onSubmit={e => e.preventDefault()}><input aria-label="Search users" placeholder="Search name, username, email" value={q} onChange={e => setQ(e.target.value)}/></form>
-      {loading ? <Loading/> : error ? <ErrorState message={error}/> : !people.length ? <Empty title="No users" text="Try another search."/> : <div className="dash-table-wrap"><table className="dash-table"><thead><tr><th>Person</th><th>Email</th><th>Subscription</th><th>Role</th></tr></thead><tbody>{people.map(p => <tr key={p.id}><td><strong>{p.name}</strong><span>@{p.username}</span></td><td>{p.email || '—'}</td><td><Subscription person={p}/></td><td>{p.id === user.id ? <span className="dash-self">{p.account} · you</span> : <select aria-label={`Role for ${p.username}`} value={p.account || 'normal'} onChange={e => setAccount(p.id, e.target.value)}>{ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}</select>}</td></tr>)}</tbody></table></div>}
+      {loading ? <Loading/> : error ? <ErrorState message={error}/> : !people.length ? <Empty title="No users" text="Try another search."/> : <div className="dash-table-wrap"><table className="dash-table"><thead><tr><th>Person</th><th>Email</th><th>Subscription</th><th>Role</th></tr></thead><tbody>{people.map(p => <tr key={p.id}><td><strong>{p.name}</strong><span>@{p.username}</span></td><td>{p.email || 'Not given'}</td><td><Subscription person={p}/></td><td>{p.id === user.id ? <span className="dash-self">{p.account} · you</span> : <select aria-label={`Role for ${p.username}`} value={p.account || 'normal'} onChange={e => setAccount(p.id, e.target.value)}>{ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}</select>}</td></tr>)}</tbody></table></div>}
     </>}
     {tab === 'orders' && (lo ? <Loading/> : eo ? <ErrorState message={eo}/> : !(orders?.orders || []).length ? <Empty title="No Premium requests" text="When someone submits the buy form, they appear here."/> : <ul className="order-grid">{orders.orders.map(o => <li key={o.id}>
       <button type="button" className="order-card" onClick={() => setOpen(o)}>
@@ -59,7 +59,7 @@ export default function DashboardPage() {
         <span className={`order-status is-${o.status}`}>{o.status}</span>
       </button>
     </li>)}</ul>)}
-    <Modal wide open={!!open} onClose={() => setOpen(null)} title={open ? `Premium request — ${open.name}` : ''} description="Check the payment screenshot against the details before approving.">
+    <Modal wide open={!!open} onClose={() => setOpen(null)} title={open ? `Premium request from ${open.name}` : ''} description="Check the payment screenshot against the details before approving.">
       {open && <div className="order-detail">
         <div className="order-detail-proof">{open.hasProof ? <a href={open.proofUrl} target="_blank" rel="noreferrer" title="Open the full image"><img src={open.proofUrl} alt={`Payment screenshot from ${open.name}`}/></a> : <span className="order-detail-noproof"><ImageOff size={24}/> No screenshot on this request</span>}</div>
         <dl className="order-detail-list">

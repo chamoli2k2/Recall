@@ -4,13 +4,13 @@ import { UserPlus, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { reportError } from '../services/errors';
-import { useApp, useLoad } from '../hooks/useApp';
+import { useApp, useQuery } from '../hooks/useApp';
 import { Avatar, Button, Loading, ErrorState, Empty } from '../components/ui';
 export default function FriendsPage() {
-  const { revision, refresh } = useApp();
+  const { refresh } = useApp();
   const [tab, setTab] = useState('friends');
-  const { data: friends, loading: lf, error: ef } = useLoad(() => api('/me/friends'), [revision]);
-  const { data: requests, loading: lr, error: er } = useLoad(() => api('/me/requests'), [revision]);
+  const { data: friends, loading: lf, error: ef } = useQuery('/me/friends');
+  const { data: requests, loading: lr, error: er } = useQuery('/me/requests');
   const people = tab === 'friends' ? friends?.people || [] : requests?.people || [];
   const loading = tab === 'friends' ? lf : lr; const error = tab === 'friends' ? ef : er;
   async function act(username, path, method = 'POST') {

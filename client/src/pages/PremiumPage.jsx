@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Crown, Check, QrCode, Copy, Clock3, Sparkles, Infinity as Forever, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
-import { useApp, useLoad } from '../hooks/useApp';
+import { useApp, useQuery } from '../hooks/useApp';
 import { Loading } from '../components/ui';
 import PaymentForm from '../components/PaymentForm';
 import { hasPremium, PREMIUM_FEATURES, PREMIUM_PLANS, planById } from '../../../shared/account.js';
@@ -36,9 +36,9 @@ const STEPS = {
 };
 
 export default function PremiumPage() {
-  const { user, revision } = useApp();
+  const { user } = useApp();
   const unlocked = hasPremium(user);
-  const { data, loading } = useLoad(() => api('/premium/order').catch(() => ({ order: null, subscription: null, methods: [] })), [user?.account, revision]);
+  const { data, loading } = useQuery('/premium/order', () => api('/premium/order').catch(() => ({ order: null, subscription: null, methods: [] })));
   const [plan, setPlan] = useState('yearly');
   const [method, setMethod] = useState(null);
   const order = data?.order, sub = data?.subscription, methods = data?.methods || [];

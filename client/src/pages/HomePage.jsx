@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, RotateCcw, Layers, Users, Brain, Globe2, LockKeyhole, Sparkles, Search, ChevronDown } from 'lucide-react';
 import { api, imageUrl } from '../services/api';
-import { useLoad } from '../hooks/useApp';
+import { useQuery } from '../hooks/useApp';
 import { FolderIcon, Loading, Avatar, Empty } from '../components/ui';
+import { BRAND } from '../../../shared/brand.js';
 function matchesFolder(folder, query) {
   if (!query) return true;
   const hay = `${folder.title} ${folder.description} ${folder.tags?.join(' ') || ''} ${folder.owner?.username || ''}`.toLowerCase();
@@ -24,22 +25,22 @@ function HeroCard() {
   </article></div>;
 }
 const FAQS = [
-  ['Is Recall actually free?',
-    'Yes, and it is the useful part that is free rather than a crippled trial. Accounts, collections, cards, spaced-repetition study, publishing to the community, and your own progress tracking all cost nothing, with no card on file. Premium adds projects, importing and exporting decks, folder covers, hosting live quizzes, and inviting editors.'],
-  ['How does Recall decide what to show me each day?',
-    'It uses FSRS, a modern spaced-repetition scheduler. Rate each answer honestly and it works out roughly when you are about to forget that particular card, then brings it back just before you do. Cards you find hard return sooner, ones you know well drift weeks or months out. A few minutes on most days is genuinely enough.'],
+  [`Is ${BRAND.name} actually free?`,
+    'Yes, and the free tier is the whole product rather than a teaser. Accounts, collections, cards, spaced repetition, publishing to the community, and your own progress all cost nothing, and we never ask for a card. Premium adds projects, deck import and export, folder covers, live quiz hosting, and editor invites.'],
+  [`How does ${BRAND.name} decide what to show me each day?`,
+    'It runs on FSRS, the scheduler behind modern Anki. Rate each answer honestly and it works out when you are about to forget that particular card, then brings it back just before you do. Hard cards return in a day or two, ones you know well drift out to weeks or months. Most people need a few minutes a day.'],
   ['What happens if I miss a few days?',
-    'Nothing breaks and nothing is lost. There is no streak to protect and no penalty for stopping. Your due cards wait for you, and when you come back the schedule adjusts to what you actually remember rather than what you were supposed to have done.'],
+    'Nothing breaks and nothing is lost. There is no streak to protect, so there is nothing to feel bad about. Your due cards wait, and when you come back the schedule works from what you actually remember rather than what you meant to do.'],
   ['Can I study with friends, or run a class?',
-    'Both. Any folder can be shared with people by username, as a viewer or, on Premium, as an editor who can work on it with you in real time. Classrooms go further: you buy seats, invite people with a code or a link, set assignments with due dates, and get a coverage and accuracy report for the whole group.'],
+    'Both. Share any folder by username, as a viewer or, on Premium, as an editor who can work on it with you live. Classrooms go further: buy seats, invite people with a code or link, set assignments with due dates, and read a coverage and accuracy report for the group.'],
   ['Who can see what I make?',
-    'Only you, until you decide otherwise. New collections are private. You can share one with named people, or publish it so anyone can read and copy it. Even inside a classroom, teachers only see progress on the classroom’s own material — your personal library stays entirely yours.'],
+    'Only you, until you say otherwise. New collections are private. You can share one with named people, or publish it for anyone to read and copy. Even in a classroom, teachers only see progress on the classroom’s own material, never your personal library.'],
   ['Will I ever be charged automatically?',
-    'No. There is no auto-renewal and we do not keep a mandate against your card or UPI ID. Every plan is a single payment for a fixed period, and when it runs out your account simply returns to the free tier with all your content intact. If you change your mind, personal plans are fully refundable for 7 days and Lifetime for 14.'],
+    'No. There is no auto-renewal and we hold no mandate against your card or UPI ID. Each plan is one payment for a fixed period. When it runs out your account drops back to the free tier and every card you made stays exactly where it is. Changed your mind? Personal plans refund in full for 7 days, Lifetime for 14.'],
   ['Can I bring in decks I already have, and get them out again?',
-    'Yes, in both directions. Premium accounts can import from Anki, CSV, Markdown, or JSON, and export any folder back out as JSON or CSV at any time. Your material is never held hostage.'],
+    'Yes, both ways. Premium accounts import from Anki, CSV, Markdown, or JSON, and export any folder back out as JSON or CSV whenever they like. Your cards are never locked in.'],
   ['Does it work on my phone?',
-    'Yes. Recall runs in any modern browser and the layout adapts to phones and tablets, so you can review on a commute and build cards properly on a laptop later. Everything lives on your account, so it is the same library either way.'],
+    `Yes. ${BRAND.name} runs in any modern browser and the layout adapts to phones and tablets, so you can review on the bus and write cards properly on a laptop later. It is one library either way.`],
 ];
 function Faq() {
   return <section className="home-faq" id="faq">
@@ -47,7 +48,7 @@ function Faq() {
       <span className="eyebrow">GOOD QUESTIONS</span>
       <h2>The things people ask before they start</h2>
       <p>Short answers, honestly given. If yours is not here, we would like to hear it.</p>
-      <p className="home-faq-foot">Something we did not cover? <Link to="/contact">Ask us directly</Link> — a person reads every message.</p>
+      <p className="home-faq-foot">Something we did not cover? <Link to="/contact">Ask us directly</Link>, and a person will read it.</p>
     </div>
     <div className="faq-list">
       {FAQS.map(([question, answer]) => <details className="faq-item" key={question}>
@@ -67,8 +68,8 @@ function PublicFolderCard({ folder }) {
 export default function HomePage() {
   const [params, setParams] = useSearchParams();
   const query = params.get('q') || '';
-  const { data, loading } = useLoad(() => api('/folders?scope=explore').catch(() => ({ folders: [] })), []);
-  const { data: people } = useLoad(() => query.trim().length >= 2 ? api(`/users?q=${encodeURIComponent(query.trim())}`).catch(() => ({ users: [] })) : Promise.resolve({ users: [] }), [query]);
+  const { data, loading } = useQuery('/folders?scope=explore', () => api('/folders?scope=explore').catch(() => ({ folders: [] })));
+  const { data: people } = useQuery(`/users?q=${encodeURIComponent(query.trim())}`, undefined, { enabled: query.trim().length >= 2 });
   const all = data?.folders || [];
   const folders = all.filter(f => matchesFolder(f, query));
   return <div className="home">
@@ -76,21 +77,21 @@ export default function HomePage() {
       <div className="home-hero-copy">
         <span className="eyebrow"><Sparkles size={12}/> A SPACE FOR YOUR CURIOSITY</span>
         <h1>Learn a little.<br/>Remember a lot.</h1>
-        <p>Recall turns what you read, hear, and wonder about into flashcards you actually revisit. Build collections, study with spaced repetition, and learn alongside people you trust.</p>
+        <p>{BRAND.name} turns what you read, hear, and wonder about into flashcards you actually revisit. Build collections, study with spaced repetition, and learn alongside people you trust.</p>
         <div className="home-hero-actions"><Link className="button primary" to="/signup">Start for free <ArrowRight size={17}/></Link><Link className="button secondary" to="/explore">Browse public collections</Link></div>
         <div className="home-hero-notes"><span><LockKeyhole size={13}/> Private by default</span><span><Users size={13}/> Share by username</span><span><Brain size={13}/> Smart review scheduling</span></div>
       </div>
       <HeroCard/>
     </section>
-    <section className="home-steps" aria-label="How Recall works">
-      {[[Layers, 'Collect', 'Create folders for anything worth remembering. Add two-sided text or image cards, tags, hints, and sources.'], [Brain, 'Recall', 'Study what is due. Rate each answer honestly and Recall brings difficult cards back sooner.'], [Users, 'Share', 'Invite collaborators as viewers or editors, publish a collection to the world, or keep it just for you.']].map(([Icon, title, text], i) => <div className="home-step" key={title}><span className="home-step-index">0{i + 1}</span><span className="home-step-icon"><Icon size={20}/></span><h3>{title}</h3><p>{text}</p></div>)}
+    <section className="home-steps" aria-label={`How ${BRAND.name} works`}>
+      {[[Layers, 'Collect', 'Create folders for anything worth remembering. Add two-sided text or image cards, tags, hints, and sources.'], [Brain, 'Recall', `Study what is due. Rate each answer honestly and ${BRAND.name} brings difficult cards back sooner.`], [Users, 'Share', 'Invite collaborators as viewers or editors, publish a collection to the world, or keep it just for you.']].map(([Icon, title, text], i) => <div className="home-step" key={title}><span className="home-step-index">0{i + 1}</span><span className="home-step-icon"><Icon size={20}/></span><h3>{title}</h3><p>{text}</p></div>)}
     </section>
     <section className="home-community" id="library">
       <div className="library-section-heading"><div><span className="eyebrow">THE COMMUNITY LIBRARY</span><h2>Public collections, ready to study</h2></div><Link to="/explore" className="text-button">Explore all <ArrowRight size={15}/></Link></div>
       <form className="home-search folder-search" onSubmit={e => e.preventDefault()}><Search size={16}/><input aria-label="Search public collections and people" placeholder="Search collections or people…" value={query} onChange={e => setParams(e.target.value ? { q: e.target.value } : {})}/></form>
       {people?.users?.length > 0 && <div className="people-hits">{people.users.map(p => <Link key={p.id} className="person-chip" to={`/u/${p.username}`}><Avatar user={p} small/> {p.name} <small>@{p.username}</small></Link>)}</div>}
-      {loading ? <Loading/> : !folders.length ? query ? <Empty title="No matching collections" text="Try another word — titles, descriptions, tags, and authors are searchable without an account."/> : <div className="home-empty"><Globe2 size={22}/><p>No public collections yet. Be the first — create an account and publish a folder.</p></div> : <div className="home-folder-grid">{folders.map(f => <PublicFolderCard folder={f} key={f.id}/>)}</div>}
-      <p className="home-community-note">Anyone can read and flip public cards. To save a collection, make a private copy, track progress, or create your own, you’ll need an account — it takes a few seconds.</p>
+      {loading ? <Loading/> : !folders.length ? query ? <Empty title="No matching collections" text="Try another word. Titles, descriptions, tags, and authors are all searchable without an account."/> : <div className="home-empty"><Globe2 size={22}/><p>No public collections yet. Be the first: create an account and publish a folder.</p></div> : <div className="home-folder-grid">{folders.map(f => <PublicFolderCard folder={f} key={f.id}/>)}</div>}
+      <p className="home-community-note">Anyone can read and flip public cards. To save a collection, make a private copy, track progress, or create your own, you’ll need an account, which takes a few seconds.</p>
     </section>
     <Faq/>
     <section className="home-cta">
