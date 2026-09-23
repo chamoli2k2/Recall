@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowRight, RotateCcw, Layers, Users, Brain, Globe2, LockKeyhole, Sparkles, Search } from 'lucide-react';
+import { ArrowRight, RotateCcw, Layers, Users, Brain, Globe2, LockKeyhole, Sparkles, Search, ChevronDown } from 'lucide-react';
 import { api, imageUrl } from '../services/api';
 import { useLoad } from '../hooks/useApp';
 import { FolderIcon, Loading, Avatar, Empty } from '../components/ui';
@@ -22,6 +22,40 @@ function HeroCard() {
     <button type="button" className="home-hero-card-body" aria-label={flipped ? 'Show question' : 'Reveal answer'} onClick={() => setFlipped(f => !f)}><p>{flipped ? card.back : card.front}</p><small>{flipped ? 'Tap to see the question' : 'Tap to reveal the answer'}</small></button>
     <div className="home-hero-card-actions">{flipped ? <><button type="button" className="rating again" onClick={next}><span>Again</span></button><button type="button" className="rating good" onClick={next}><span>Good</span></button><button type="button" className="rating easy" onClick={next}><span>Easy</span></button></> : <button type="button" className="text-button" onClick={() => setFlipped(true)}><RotateCcw size={14}/> Flip the card</button>}</div>
   </article></div>;
+}
+const FAQS = [
+  ['Is Recall actually free?',
+    'Yes, and it is the useful part that is free rather than a crippled trial. Accounts, collections, cards, spaced-repetition study, publishing to the community, and your own progress tracking all cost nothing, with no card on file. Premium adds projects, importing and exporting decks, folder covers, hosting live quizzes, and inviting editors.'],
+  ['How does Recall decide what to show me each day?',
+    'It uses FSRS, a modern spaced-repetition scheduler. Rate each answer honestly and it works out roughly when you are about to forget that particular card, then brings it back just before you do. Cards you find hard return sooner, ones you know well drift weeks or months out. A few minutes on most days is genuinely enough.'],
+  ['What happens if I miss a few days?',
+    'Nothing breaks and nothing is lost. There is no streak to protect and no penalty for stopping. Your due cards wait for you, and when you come back the schedule adjusts to what you actually remember rather than what you were supposed to have done.'],
+  ['Can I study with friends, or run a class?',
+    'Both. Any folder can be shared with people by username, as a viewer or, on Premium, as an editor who can work on it with you in real time. Classrooms go further: you buy seats, invite people with a code or a link, set assignments with due dates, and get a coverage and accuracy report for the whole group.'],
+  ['Who can see what I make?',
+    'Only you, until you decide otherwise. New collections are private. You can share one with named people, or publish it so anyone can read and copy it. Even inside a classroom, teachers only see progress on the classroom’s own material — your personal library stays entirely yours.'],
+  ['Will I ever be charged automatically?',
+    'No. There is no auto-renewal and we do not keep a mandate against your card or UPI ID. Every plan is a single payment for a fixed period, and when it runs out your account simply returns to the free tier with all your content intact. If you change your mind, personal plans are fully refundable for 7 days and Lifetime for 14.'],
+  ['Can I bring in decks I already have, and get them out again?',
+    'Yes, in both directions. Premium accounts can import from Anki, CSV, Markdown, or JSON, and export any folder back out as JSON or CSV at any time. Your material is never held hostage.'],
+  ['Does it work on my phone?',
+    'Yes. Recall runs in any modern browser and the layout adapts to phones and tablets, so you can review on a commute and build cards properly on a laptop later. Everything lives on your account, so it is the same library either way.'],
+];
+function Faq() {
+  return <section className="home-faq" id="faq">
+    <div className="home-faq-head">
+      <span className="eyebrow">GOOD QUESTIONS</span>
+      <h2>The things people ask before they start</h2>
+      <p>Short answers, honestly given. If yours is not here, we would like to hear it.</p>
+      <p className="home-faq-foot">Something we did not cover? <Link to="/contact">Ask us directly</Link> — a person reads every message.</p>
+    </div>
+    <div className="faq-list">
+      {FAQS.map(([question, answer]) => <details className="faq-item" key={question}>
+        <summary>{question}<ChevronDown className="faq-chevron" size={18}/></summary>
+        <div className="faq-answer"><p>{answer}</p></div>
+      </details>)}
+    </div>
+  </section>;
 }
 function PublicFolderCard({ folder }) {
   return <Link className={`home-folder ${folder.color}`} to={`/folders/${folder.id}`}>
@@ -58,6 +92,7 @@ export default function HomePage() {
       {loading ? <Loading/> : !folders.length ? query ? <Empty title="No matching collections" text="Try another word — titles, descriptions, tags, and authors are searchable without an account."/> : <div className="home-empty"><Globe2 size={22}/><p>No public collections yet. Be the first — create an account and publish a folder.</p></div> : <div className="home-folder-grid">{folders.map(f => <PublicFolderCard folder={f} key={f.id}/>)}</div>}
       <p className="home-community-note">Anyone can read and flip public cards. To save a collection, make a private copy, track progress, or create your own, you’ll need an account — it takes a few seconds.</p>
     </section>
+    <Faq/>
     <section className="home-cta">
       <div><span className="banner-label"><i className="tiny-line"/> ONE CARD AT A TIME</span><h2>Your future self will thank you.</h2><p>Free to use. No credit card, no email verification, no noise.</p></div>
       <div className="home-cta-actions"><Link className="button white-button" to="/signup">Create your account</Link><Link className="text-button" to="/login">I already have one <ArrowRight size={15}/></Link></div>
