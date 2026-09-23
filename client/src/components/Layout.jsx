@@ -58,7 +58,7 @@ export default function Layout() {
   return <div className="app-shell">
     {mobile && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobile(false)}/>}
     <aside className={`sidebar ${mobile ? 'open' : ''}`}>
-      <Link className="brand" to="/" onClick={() => setMobile(false)}><img src="/favicon.svg" alt=""/>{BRAND.wordmark}<span className="brand-period">.</span></Link>
+      <Link className="brand" to="/" onClick={() => setMobile(false)}><img src="/favicon.svg" alt=""/><span className="brand-word">{BRAND.name}<span className="brand-period">.</span></span></Link>
       <Button className="primary sidebar-create" onClick={() => setCreate(true)}><Plus size={19}/> Create a folder</Button>
       <div className="sidebar-scroll">
       <div className="nav-caption">WORKSPACE</div>

@@ -16,8 +16,6 @@ const slug = name.toLowerCase();
 export const BRAND = {
   name,
   slug,
-  /** The lowercase wordmark in the sidebar and on the marketing header. */
-  wordmark: slug,
   tagline: 'Learn a little. Remember a lot.',
   description: `${name}: a thoughtful space to create flashcards, learn together, and remember more.`,
   title: `${name}, your learning library`,

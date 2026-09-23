@@ -6,7 +6,7 @@ export default function SiteFooter() {
     <div className="site-footer-inner">
       <p className="site-footer-copy">
         <img src="/favicon.svg" alt=""/>
-        <strong>{BRAND.name}</strong>
+        <strong>{BRAND.name}<span className="brand-period">.</span></strong>
         <span className="site-footer-tag">{BRAND.tagline}</span>
       </p>
       <div className="site-footer-links">

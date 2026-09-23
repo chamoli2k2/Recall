@@ -6,7 +6,6 @@ import { BRAND, brandName, sessionCookieNames, storageKeys } from '../../shared/
 
 test('the display values all derive from the name', () => {
   assert.equal(brandName, BRAND.name);
-  assert.equal(BRAND.wordmark, BRAND.name.toLowerCase());
   assert.ok(BRAND.title.startsWith(BRAND.name));
   assert.ok(BRAND.description.startsWith(BRAND.name));
   assert.ok(BRAND.legalName.startsWith(BRAND.name));
