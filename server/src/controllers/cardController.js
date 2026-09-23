@@ -6,6 +6,7 @@ import { requireFolderPremium } from '../services/teamAccess.js';
 import { assert } from '../utils/errors.js';
 import { parseFile, toCsv, MAX_CARDS } from '../services/importService.js';
 import { cardSchema } from '../middleware/validate.js';
+import { BRAND } from '../../../shared/brand.js';
 export const list = async (req, res) => res.json({ cards: await cards.listCards(req.params.id, req.user) });
 export const create = async (req, res) => res.status(201).json({ card: await cards.createCard(req.params.id, req.user, req.body) });
 export const update = async (req, res) => res.json({ card: await cards.updateCard(req.params.id, req.user, req.body) });
@@ -35,8 +36,8 @@ export const importFile = async (req, res) => {
 };
 export const exportFile = async (req, res) => {
   await requireFolderPremium(req.user, await accessFolder(req.params.id, req.user), 'Exporting cards');
-  const { folder, cards: list } = await cards.exportCards(req.params.id, req.user); const name = folder.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'recall-export';
+  const { folder, cards: list } = await cards.exportCards(req.params.id, req.user); const name = folder.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || `${BRAND.slug}-export`;
   if (req.query.format === 'csv') return res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}.csv"` }).send(toCsv(list));
-  res.set({ 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}.json"` }).send(JSON.stringify({ app: 'recall', version: 1, exportedAt: new Date().toISOString(), folder: { title: folder.title, description: folder.description, tags: [...new Set(list.flatMap(c => c.tags))] }, cards: list }, null, 2));
+  res.set({ 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}.json"` }).send(JSON.stringify({ app: BRAND.slug, version: 1, exportedAt: new Date().toISOString(), folder: { title: folder.title, description: folder.description, tags: [...new Set(list.flatMap(c => c.tags))] }, cards: list }, null, 2));
 };
 export const image = async (req, res) => { const media = await Media.findById(req.params.id).select('+data'); assert(media, 404, 'Image not found.'); await accessFolder(media.folder, req.user); res.set({ 'Content-Type': media.contentType, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }).send(media.data); };

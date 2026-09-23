@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { BRAND } from './shared/brand.js';
+import { BRAND, storageKeys } from './shared/brand.js';
 
 /** index.html cannot import modules, so the %BRAND_*% placeholders in it are filled from the same
  *  config the app uses. Renaming the product stays a one-line change. */
@@ -8,7 +8,8 @@ const brandHtml = () => ({
   name: 'brand-html',
   transformIndexHtml: html => html
     .replace(/%BRAND_TITLE%/g, BRAND.title)
-    .replace(/%BRAND_DESCRIPTION%/g, BRAND.description),
+    .replace(/%BRAND_DESCRIPTION%/g, BRAND.description)
+    .replace(/%BRAND_THEME_KEYS%/g, storageKeys('theme').join(',')),
 });
 
 export default defineConfig({

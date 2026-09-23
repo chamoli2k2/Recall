@@ -6,6 +6,7 @@ import { useApp, useQuery } from '../hooks/useApp';
 import { Loading } from '../components/ui';
 import PaymentForm from '../components/PaymentForm';
 import { hasPremium, PREMIUM_FEATURES, PREMIUM_PLANS, planById } from '../../../shared/account.js';
+import { BRAND } from '../../../shared/brand.js';
 const UPI_ID = 'your-upi-id@bank';
 const money = n => `₹${n.toLocaleString('en-IN')}`;
 const perMonth = plan => plan.days ? `${money(Math.round(plan.price / (plan.days / 30)))}/mo` : 'one payment';
@@ -46,7 +47,7 @@ export default function PremiumPage() {
   return <>
     <section className="premium-hero">
       <div>
-        <span className="premium-badge"><Crown size={13}/> RECALL PREMIUM</span>
+        <span className="premium-badge"><Crown size={13}/> {BRAND.name.toUpperCase()} PREMIUM</span>
         <h1>{unlocked ? 'You have Premium.' : 'Study with the full toolkit.'}</h1>
         <p>{unlocked ? 'Projects, imports, live quizzes, folder covers, and editor invites are unlocked on this account.' : 'Keep the free library exactly as it is, and add the six tools below.'}</p>
         {unlocked && <span className="premium-plan"><Check size={14}/> {sub?.planLabel || user.account} · {sub?.expiresAt ? `${sub.daysLeft} day${sub.daysLeft === 1 ? '' : 's'} left` : 'never expires'}</span>}

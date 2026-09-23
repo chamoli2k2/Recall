@@ -23,7 +23,7 @@ function readCredentials() {
   return {
     username: (process.env.SEED_USERNAME || fromFile.username || 'demolearner').toLowerCase(),
     password: process.env.SEED_PASSWORD || fromFile.password,
-    email: (process.env.SEED_EMAIL || fromFile.email || 'demolearner@recall.demo').toLowerCase(),
+    email: (process.env.SEED_EMAIL || fromFile.email || 'demolearner@remio.demo').toLowerCase(),
     name: process.env.SEED_NAME || fromFile.name || 'Demo Learner',
   };
 }

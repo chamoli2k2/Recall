@@ -1,7 +1,7 @@
-# Recall external health ping — every 5 minutes from a machine that is NOT the Recall host.
+# Remio external health ping — every 5 minutes from a machine that is NOT the Remio host.
 # Install:  crontab -e   then paste the two lines below (adjust the paths and URL).
-# Logs:     tail -f ~/recall-healthcheck.log
-# The scheduler keeps running while Recall sleeps; the request wakes an idle host. It does not
+# Logs:     tail -f ~/remio-healthcheck.log
+# The scheduler keeps running while Remio sleeps; the request wakes an idle host. It does not
 # guarantee uptime and does not bypass hosting usage limits.
-HEALTHCHECK_URL=https://recall.example.com/api/health
-*/5 * * * * /usr/bin/env node /path/to/Recall/scripts/healthcheck.js >> "$HOME/recall-healthcheck.log" 2>&1
+HEALTHCHECK_URL=https://remio.example.com/api/health
+*/5 * * * * /usr/bin/env node /path/to/Remio/scripts/healthcheck.js >> "$HOME/remio-healthcheck.log" 2>&1

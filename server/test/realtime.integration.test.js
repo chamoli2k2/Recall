@@ -10,6 +10,7 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createApp } from '../src/app.js';
 import { allModels, CardDoc, User } from '../src/models/index.js';
 import { attachRealtime, presence, docs, rooms } from '../src/realtime/index.js';
+import { BRAND } from '../../shared/brand.js';
 const enabled = process.env.RUN_INTEGRATION === '1';
 let mongo, server, io, url, owner, editor, outsider, folderId, cardId;
 const password = 'Integration-only-password-2026';
@@ -21,7 +22,7 @@ const connected = socket => new Promise((resolve, reject) => { socket.once('conn
 before(async () => {
   if (!enabled) return;
   if (!process.env.TEST_MONGODB_URI) mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
-  await mongoose.connect(process.env.TEST_MONGODB_URI || mongo.getUri(), { dbName: `recall_rt_${crypto.randomBytes(6).toString('hex')}` });
+  await mongoose.connect(process.env.TEST_MONGODB_URI || mongo.getUri(), { dbName: `${BRAND.slug}_rt_${crypto.randomBytes(6).toString('hex')}` });
   await Promise.all(allModels.map(m => m.init()));
   server = http.createServer(createApp()); await new Promise(r => server.listen(0, '127.0.0.1', r)); url = `http://127.0.0.1:${server.address().port}`;
   io = attachRealtime(server, ['http://trusted.example']);

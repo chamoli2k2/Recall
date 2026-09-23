@@ -1,5 +1,5 @@
 [Unit]
-Description=Run the Recall health ping every 5 minutes
+Description=Run the Remio health ping every 5 minutes
 
 [Timer]
 OnBootSec=1min

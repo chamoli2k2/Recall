@@ -1,0 +1,9 @@
+# Copy to ~/.config/systemd/user/ (or /etc/systemd/system/) together with remio-healthcheck.timer.
+# Then: systemctl --user daemon-reload && systemctl --user enable --now remio-healthcheck.timer
+[Unit]
+Description=Remio external health ping (one shot)
+
+[Service]
+Type=oneshot
+Environment=HEALTHCHECK_URL=https://remio.example.com/api/health
+ExecStart=/usr/bin/env node /path/to/Remio/scripts/healthcheck.js

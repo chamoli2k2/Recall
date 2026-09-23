@@ -6,7 +6,7 @@ import { BRAND } from '../../../shared/brand.js';
 export default class ErrorBoundary extends Component {
   state = { error: null };
   static getDerivedStateFromError(error) { return { error }; }
-  componentDidCatch(error, info) { console.error('[recall] render failed', error, info?.componentStack); }
+  componentDidCatch(error, info) { console.error(`[${BRAND.slug}] render failed`, error, info?.componentStack); }
   render() {
     if (!this.state.error) return this.props.children;
     return <div className="crash-screen" role="alert">

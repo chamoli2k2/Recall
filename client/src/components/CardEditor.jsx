@@ -9,6 +9,7 @@ import { colorFor } from '../services/colors';
 import CollabText, { PlainText } from './CollabText';
 import RichText from './RichText';
 import { CLOZE_RE, hasCloze } from '../../../shared/cloze.js';
+import { BRAND } from '../../../shared/brand.js';
 const nextCloze = text => Math.max(0, ...[...String(text).matchAll(CLOZE_RE)].map(m => Number(m[1]))) + 1;
 /** Re-renders when a shared Y.Text changes so the live preview follows collaborators' edits too. */
 function useYTextValue(ytext, enabled) {
@@ -38,7 +39,7 @@ function SideEditor({ side, index, collaborative, live, form, updateSide, pasteI
 }
 export default function CardEditor({ folder, card, onClose, onEditing, liveVersion }) {
   const { refresh, user } = useApp(); const blank = { front: { text: '', image: null }, back: { text: '', image: null }, tags: [], hint: '', source: '' };
-  const key = `recall-draft:${user.id}:${folder.id}:${card?.id || 'new'}`;
+  const key = `${BRAND.storage.draft}:${user.id}:${folder.id}:${card?.id || 'new'}`;
   const [form, setForm] = useState(() => { try { const draft = JSON.parse(sessionStorage.getItem(key)); if (draft) return draft; } catch {} return card ? { front: card.front, back: card.back, tags: card.tags, hint: card.hint, source: card.source } : blank; });
   const [tag, setTag] = useState(''), [busy, setBusy] = useState(false), [uploading, setUploading] = useState(''), [error, setError] = useState(''), [history, setHistory] = useState(null), [preview, setPreview] = useState(false);
   // Existing cards are co-edited through a shared CRDT document; new cards are drafted locally until created.

@@ -1,6 +1,6 @@
 # API overview
 
-All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session` cookie automatically. Server errors return `{ "error": "message", "code": "optional code" }`.
+All routes use the `/api` prefix. The browser sends the HttpOnly `remio_session` cookie automatically. Server errors return `{ "error": "message", "code": "optional code" }`.
 
 | Method | Route | Access / purpose |
 | --- | --- | --- |
@@ -76,7 +76,7 @@ All routes use the `/api` prefix. The browser sends the HttpOnly `recall_session
 
 ## Realtime (Socket.IO, same origin, path `/socket.io`)
 
-The socket authenticates from the `recall_session` cookie during the handshake; the `Origin` header must be same-origin or in `CLIENT_ORIGIN`. Sockets are observe-only: no event mutates data. Every write still goes through the HTTP routes above.
+The socket authenticates from the `remio_session` cookie during the handshake; the `Origin` header must be same-origin or in `CLIENT_ORIGIN`. Sockets are observe-only: no event mutates data. Every write still goes through the HTTP routes above.
 
 | Direction | Event | Payload / purpose |
 | --- | --- | --- |

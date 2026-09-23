@@ -10,6 +10,7 @@ import { RoomStore } from './rooms.js';
 import { notifications, presentNotification } from '../services/notificationService.js';
 import { toAppError, GENERIC } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
+import { sessionCookieNames } from '../../../shared/brand.js';
 /**
  * Sockets answer with `{ ok, error }` instead of HTTP statuses, so failures run through the same
  * classifier and only exposed messages are sent back. `translate` lets a handler keep the wording
@@ -37,7 +38,7 @@ export function attachRealtime(httpServer, origins) {
   });
   // Authenticate from the same HttpOnly session cookie the API uses. Anonymous sockets may watch public folders.
   io.use(async (socket, next) => {
-    try { const token = parseCookies(socket.handshake.headers.cookie).recall_session; if (token) { const s = await Session.findOne({ tokenHash: hashToken(token), expiresAt: { $gt: new Date() } }); if (s) socket.data.user = await User.findById(s.user); } next(); } catch (e) { next(e); }
+    try { const cookies = parseCookies(socket.handshake.headers.cookie); const token = sessionCookieNames.map(n => cookies[n]).find(Boolean); if (token) { const s = await Session.findOne({ tokenHash: hashToken(token), expiresAt: { $gt: new Date() } }); if (s) socket.data.user = await User.findById(s.user); } next(); } catch (e) { next(e); }
   });
   const room = id => `folder:${id}`, docRoom = id => `doc:${id}`, quizRoom = code => `quiz:${code}`;
   const broadcastPresence = folderId => io.to(room(folderId)).emit('presence', folderId, presence.list(folderId));

@@ -34,7 +34,7 @@ test('mongo and multer failures are translated, not leaked', () => {
 });
 
 test('an unexpected throw is a 500 whose message is never shown to the user', () => {
-  const secret = new Error('mongodb://admin:hunter2@cluster0/recall timed out');
+  const secret = new Error('mongodb://admin:hunter2@cluster0/app timed out');
   const error = toAppError(secret);
   assert.equal(error.status, 500);
   assert.equal(error.expose, false);

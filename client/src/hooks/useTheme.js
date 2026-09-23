@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-const KEY = 'recall-theme';
+import { BRAND, storageKeys } from '../../../shared/brand.js';
+const KEY = BRAND.storage.theme;
 const systemDark = () => typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
-const read = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
+const read = () => { try { return storageKeys('theme').map(k => localStorage.getItem(k)).find(Boolean) ?? null; } catch { return null; } };
 export const resolveTheme = (preference = read()) => preference === 'dark' || preference === 'light' ? preference : systemDark() ? 'dark' : 'light';
 function apply(theme) {
   document.documentElement.dataset.theme = theme;

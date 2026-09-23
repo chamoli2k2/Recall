@@ -1,15 +1,23 @@
 /**
  * Everything that names the product lives here. Change `name` and the whole app follows: page titles,
- * the wordmark, error copy, legal pages, server logs, and the HTML shell, which Vite rewrites at build
- * time from these same values. Nothing else in the codebase should spell the product name out.
+ * the wordmark, error copy, legal pages, server logs, the session cookie, browser storage keys, and
+ * the HTML shell, which Vite rewrites at build time from these same values. Nothing else in the
+ * codebase should spell the product name out.
+ *
+ * The word "recall" also means retrieving a memory, which is what a flashcard app does. Those uses
+ * are the vocabulary of spaced repetition rather than the brand, so they stay as they are.
  */
-const name = 'Recall';
-const domain = 'recall.app';
+const name = 'Remio';
+const domain = 'remio.app';
+
+/** Lowercase and safe for cookie names, storage keys, log prefixes, and filenames. */
+const slug = name.toLowerCase();
 
 export const BRAND = {
   name,
+  slug,
   /** The lowercase wordmark in the sidebar and on the marketing header. */
-  wordmark: name.toLowerCase(),
+  wordmark: slug,
   tagline: 'Learn a little. Remember a lot.',
   description: `${name}: a thoughtful space to create flashcards, learn together, and remember more.`,
   title: `${name}, your learning library`,
@@ -26,6 +34,28 @@ export const BRAND = {
   },
   /** Shown as the "last updated" date on the terms and privacy pages. */
   policyUpdated: '23 September 2026',
+
+  sessionCookie: `${slug}_session`,
+  /** Keys this app owns in localStorage. */
+  storage: {
+    theme: `${slug}-theme`,
+    sidebar: `${slug}:sidebar`,
+    draft: `${slug}-draft`,
+  },
+
+  /**
+   * Slugs the product used to go by. A rename would otherwise invalidate every session cookie and
+   * every saved preference, so both are still read under these names and rewritten under the current
+   * one. Safe to empty once the old sessions have expired.
+   */
+  legacySlugs: ['recall'],
 };
 
 export const brandName = BRAND.name;
+
+/** Cookie names to accept on an incoming request, current first. */
+export const sessionCookieNames = [BRAND.sessionCookie, ...BRAND.legacySlugs.map(s => `${s}_session`)];
+
+/** Storage keys to read for `which`, current first, so a rename keeps the saved value. */
+export const storageKeys = which =>
+  [BRAND.storage[which], ...BRAND.legacySlugs.map(s => BRAND.storage[which].replace(BRAND.slug, s))];

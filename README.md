@@ -1,14 +1,14 @@
-# Recall
+# Remio
 
 Collaborative flashcards: React 19, Express 5, MongoDB replica set. One Node process serves the compiled UI from `dist/` and the JSON API under `/api`.
 
 ## System architecture
 
-![Recall system architecture](docs/architecture.png)
+![Remio system architecture](docs/architecture.png)
 
 *Vector: [`docs/architecture.svg`](docs/architecture.svg).*
 
-Recall is a **single-origin monolith**. The browser talks HTTPS to Express. Express talks TLS to a MongoDB replica set (required for multi-document transactions). There is no API gateway and no message broker.
+Remio is a **single-origin monolith**. The browser talks HTTPS to Express. Express talks TLS to a MongoDB replica set (required for multi-document transactions). There is no API gateway and no message broker.
 
 | Layer | Directory | Owns |
 | --- | --- | --- |

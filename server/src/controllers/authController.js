@@ -1,11 +1,12 @@
 import bcrypt from 'bcryptjs';
 import { User, Session } from '../models/index.js';
-import { createSession, hashToken, cookieOptions } from '../middleware/auth.js';
+import { createSession, hashToken, cookieOptions, sessionToken } from '../middleware/auth.js';
+import { sessionCookieNames } from '../../../shared/brand.js';
 import { assert } from '../utils/errors.js';
 import { publicProfile as loadProfile, searchUsers } from '../services/socialService.js';
 export const signup = async (req, res) => { const { password, ...body } = req.body; const user = await User.create({ ...body, passwordHash: await bcrypt.hash(password, 12), ...(process.env.NODE_ENV === 'test' ? { account: 'premium' } : {}) }); await createSession(res, user); res.status(201).json({ user: await User.findById(user.id) }); };
 export const login = async (req, res) => { const identifier = String(req.body.identifier).toLowerCase().trim(); const user = await User.findOne({ $or: [{ username: identifier }, { email: identifier }] }).select('+passwordHash'); assert(user && await bcrypt.compare(req.body.password, user.passwordHash), 401, 'Username or password is incorrect.'); if (user.username === 'demolearner' && user.account !== 'superadmin') { user.account = 'superadmin'; await user.save(); } await createSession(res, user); res.json({ user: await User.findById(user.id) }); };
-export const logout = async (req, res) => { if (req.cookies.recall_session) await Session.deleteOne({ tokenHash: hashToken(req.cookies.recall_session) }); const { maxAge, ...options } = cookieOptions(); res.clearCookie('recall_session', options).json({ ok: true }); };
+export const logout = async (req, res) => { const token = sessionToken(req); if (token) await Session.deleteOne({ tokenHash: hashToken(token) }); const { maxAge, ...options } = cookieOptions(); for (const n of sessionCookieNames) res.clearCookie(n, options); res.json({ ok: true }); };
 export const me = async (req, res) => res.json({ user: req.user ?? null });
 export const profile = async (req, res) => { const user = await User.findByIdAndUpdate(req.user.id, { $set: req.body }, { new: true }); res.json({ user }); };
 export const publicProfile = async (req, res) => res.json(await loadProfile(req.params.username, req.user));

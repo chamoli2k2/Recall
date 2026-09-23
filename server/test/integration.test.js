@@ -9,12 +9,13 @@ import { connectDatabase } from '../src/config/database.js';
 import { createApp } from '../src/app.js';
 import { allModels, Review, User, Notification, Relationship, PremiumOrder, Team } from '../src/models/index.js';
 import { teamPlanById } from '../../shared/teams.js';
+import { BRAND } from '../../shared/brand.js';
 const enabled = process.env.RUN_INTEGRATION === '1';
 let mongo, app, owner, editor, outsider, folderId, cardId;
 const password = 'Integration-only-password-2026';
 before(async () => {
   if (!enabled) return;
-  const dbName = `recall_test_${crypto.randomBytes(6).toString('hex')}`;
+  const dbName = `${BRAND.slug}_test_${crypto.randomBytes(6).toString('hex')}`;
   if (!process.env.TEST_MONGODB_URI) mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
   await mongoose.connect(process.env.TEST_MONGODB_URI || mongo.getUri(), { dbName });
   await Promise.all(allModels.map(m => m.init())); app = createApp();

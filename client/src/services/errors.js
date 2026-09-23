@@ -39,6 +39,6 @@ export function reportError(error, fallback) {
   const message = fallback && !(error instanceof ApiError) ? fallback : messageFor(error);
   const id = error instanceof ApiError ? error.requestId : null;
   toast.error(message, id ? { description: `Reference ${id}` } : undefined);
-  if (!(error instanceof ApiError) || error.status >= 500 || error.isOffline) console.error('[recall]', error);
+  if (!(error instanceof ApiError) || error.status >= 500 || error.isOffline) console.error(`[${BRAND.slug}]`, error);
   return message;
 }

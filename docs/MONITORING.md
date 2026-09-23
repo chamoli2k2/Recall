@@ -1,6 +1,6 @@
 # External health monitoring
 
-Recall's server never schedules requests to itself. All scheduling lives outside the application, on a machine that keeps running when Recall does not. This document covers the endpoints, the ping script, and how to schedule it.
+Remio's server never schedules requests to itself. All scheduling lives outside the application, on a machine that keeps running when Remio does not. This document covers the endpoints, the ping script, and how to schedule it.
 
 ## Endpoints
 
@@ -25,13 +25,13 @@ Recall's server never schedules requests to itself. All scheduling lives outside
 | Exit code | `0` healthy, `1` unhealthy after retry, `2` `HEALTHCHECK_URL` missing or invalid |
 
 ```bash
-HEALTHCHECK_URL=https://recall.example.com/api/health node scripts/healthcheck.js
-# 2026-09-21T18:14:24.151Z [info] healthy: HTTP 200 in 42ms (attempt 1/2) https://recall.example.com/api/health
+HEALTHCHECK_URL=https://remio.example.com/api/health node scripts/healthcheck.js
+# 2026-09-21T18:14:24.151Z [info] healthy: HTTP 200 in 42ms (attempt 1/2) https://remio.example.com/api/health
 ```
 
 ## Scheduling every 5 minutes
 
-Pick one. Each runs on **your** always-on machine or a hosted runner, not on the Recall host. Replace `/path/to/Recall` and the URL.
+Pick one. Each runs on **your** always-on machine or a hosted runner, not on the Remio host. Replace `/path/to/Remio` and the URL.
 
 ### cron (Linux, macOS, any VPS)
 
@@ -42,22 +42,22 @@ crontab -e
 ```
 
 ```cron
-HEALTHCHECK_URL=https://recall.example.com/api/health
-*/5 * * * * /usr/bin/env node /path/to/Recall/scripts/healthcheck.js >> "$HOME/recall-healthcheck.log" 2>&1
+HEALTHCHECK_URL=https://remio.example.com/api/health
+*/5 * * * * /usr/bin/env node /path/to/Remio/scripts/healthcheck.js >> "$HOME/remio-healthcheck.log" 2>&1
 ```
 
-If `node` is not on cron's minimal `PATH`, use its absolute path (`which node`). Verify with `tail -f ~/recall-healthcheck.log` after five minutes.
+If `node` is not on cron's minimal `PATH`, use its absolute path (`which node`). Verify with `tail -f ~/remio-healthcheck.log` after five minutes.
 
 ### systemd timer (Linux)
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cp scheduling/systemd/recall-healthcheck.{service,timer} ~/.config/systemd/user/
+cp scheduling/systemd/remio-healthcheck.{service,timer} ~/.config/systemd/user/
 # edit Environment= and ExecStart= in the .service file
 systemctl --user daemon-reload
-systemctl --user enable --now recall-healthcheck.timer
+systemctl --user enable --now remio-healthcheck.timer
 systemctl --user list-timers            # confirm next run
-journalctl --user -u recall-healthcheck  # logs
+journalctl --user -u remio-healthcheck  # logs
 ```
 
 Enable lingering (`loginctl enable-linger $USER`) so user timers run without an interactive login.
@@ -68,7 +68,7 @@ Copy `scheduling/github-actions-healthcheck.yml.example` to `.github/workflows/h
 
 ### macOS launchd
 
-Cron works on macOS, but a `launchd` agent survives sleep/wake better. A minimal `~/Library/LaunchAgents/com.recall.healthcheck.plist` with `StartInterval` `300`, `EnvironmentVariables` → `HEALTHCHECK_URL`, and `ProgramArguments` → `[/usr/local/bin/node, /path/to/Recall/scripts/healthcheck.js]`, loaded with `launchctl load -w`, is sufficient.
+Cron works on macOS, but a `launchd` agent survives sleep/wake better. A minimal `~/Library/LaunchAgents/com.remio.healthcheck.plist` with `StartInterval` `300`, `EnvironmentVariables` → `HEALTHCHECK_URL`, and `ProgramArguments` → `[/usr/local/bin/node, /path/to/Remio/scripts/healthcheck.js]`, loaded with `launchctl load -w`, is sufficient.
 
 ## Using a hosted HTTP monitor instead of the script
 

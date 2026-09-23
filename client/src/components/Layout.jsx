@@ -12,7 +12,7 @@ import SiteFooter from './SiteFooter';
 import { PremiumMark } from './PremiumMark';
 import { hasDashboard, hasPremium } from '../../../shared/account.js';
 import { BRAND } from '../../../shared/brand.js';
-const SIDEBAR = { min: 196, max: 400, default: 240, key: 'recall:sidebar' };
+const SIDEBAR = { min: 196, max: 400, default: 240, key: BRAND.storage.sidebar };
 const clampWidth = px => Math.min(SIDEBAR.max, Math.max(SIDEBAR.min, Math.round(px)));
 /** Width lives in a CSS variable so one drag moves the sidebar and the workspace together.
  *  Zero means "never dragged", which leaves the responsive defaults in the stylesheet alone. */

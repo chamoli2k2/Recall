@@ -3,7 +3,7 @@
 # HEALTHCHECK_URL repository variable (Settings → Secrets and variables → Actions → Variables).
 # GitHub may delay or skip scheduled runs on busy periods and disables schedules on inactive
 # repositories, so treat this as best-effort, not an uptime guarantee.
-name: Recall health ping
+name: Remio health ping
 on:
   schedule:
     - cron: '*/5 * * * *'
