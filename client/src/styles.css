@@ -409,8 +409,11 @@ html[data-theme=dark] .sub-pill.is-active{background:#1f3b2c;color:#7fd3a3}html[
 .settings-panel+.settings-panel{margin-top:18px}
 .settings-panel>h2{margin:0;font-size:17px;letter-spacing:-.3px}
 .settings-lede{margin:7px 0 17px;font-size:13px;line-height:1.6;color:#796a85}
-.settings-status{display:inline-flex;align-items:center;gap:8px;margin-bottom:17px;padding:9px 13px;border:1px solid #f0dcc3;border-radius:10px;background:#fdf6ec;font-size:13px;font-weight:500;color:#a9701f}
-.settings-status-good{border-color:#cfe9da;background:#f1faf5;color:#2c7a4f;margin-bottom:0}
+/* The pill and the button that answers it sit as a matched pair, so they share a height and the
+   pill carries no margin of its own. */
+.settings-status-row{display:flex;align-items:stretch;flex-wrap:wrap;gap:11px}
+.settings-status{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:9px 14px;border:1px solid #f0dcc3;border-radius:9px;background:#fdf6ec;font-size:13px;font-weight:500;color:#a9701f}
+.settings-status-good{border-color:#cfe9da;background:#f1faf5;color:#2c7a4f}
 .settings-danger{border-color:#f0cfd7}
 .settings-danger>h2{color:#c2485f}
 .settings-danger-actions{display:flex;gap:10px;flex-wrap:wrap}

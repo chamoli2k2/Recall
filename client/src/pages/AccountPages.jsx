@@ -60,8 +60,9 @@ function EmailPanel() {
   return <div className="settings-panel">
     <h2>Confirm your email</h2>
     <p className="settings-lede">Confirming your address is what lets us help you recover the account later, and it is needed before your first payment.</p>
-    <div className="settings-status"><MailWarning size={17}/> Not confirmed yet.</div>
-    <Button loading={busy} onClick={async () => {
+    <div className="settings-status-row">
+    <span className="settings-status"><MailWarning size={17}/> Not confirmed yet.</span>
+    <Button className="primary" loading={busy} onClick={async () => {
       setBusy(true);
       try {
         const r = await api('/auth/verify-email/resend', { method: 'POST' });
@@ -70,6 +71,7 @@ function EmailPanel() {
         else toast.error(`Email is not set up on this server yet. Write to ${BRAND.email.general} and we will confirm it by hand.`);
       } catch (e) { toast.error(e.message); } finally { setBusy(false); }
     }}>Send me a confirmation link</Button>
+    </div>
   </div>;
 }
 
