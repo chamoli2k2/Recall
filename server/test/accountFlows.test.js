@@ -1,6 +1,7 @@
 import test, { before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -17,18 +18,22 @@ let mongo, app;
 const password = 'Account-tests-password-2026';
 /** Captures what would have gone out, and hands back the link so a test can follow it. */
 const sent = [];
+const mailTo = to => sent.filter(m => m.to === to);
 /**
  * Signup does not wait for the mail to go out, because a slow SMTP server must not slow down
- * creating an account. Tests therefore wait for it rather than assuming it already landed.
+ * creating an account. Tests therefore wait for it rather than assuming it already landed, and
+ * they wait on the address they care about: a straggler from an earlier test must not be mistaken
+ * for this one's.
  */
-const waitForMail = async (count = 1, timeoutMs = 2000) => {
+const waitForMail = async (to, count = 1, timeoutMs = 2000) => {
   const deadline = Date.now() + timeoutMs;
-  while (sent.length < count && Date.now() < deadline) await new Promise(r => setTimeout(r, 10));
-  assert.ok(sent.length >= count, `expected ${count} email(s), saw ${sent.length}`);
-  return sent.at(-1);
+  while (mailTo(to).length < count && Date.now() < deadline) await new Promise(r => setTimeout(r, 10));
+  const found = mailTo(to);
+  assert.ok(found.length >= count, `expected ${count} email(s) to ${to}, saw ${found.length}`);
+  return found.at(-1);
 };
-const lastLink = () => {
-  const mail = sent.at(-1);
+const linkFor = to => {
+  const mail = mailTo(to).at(-1);
   return mail && (mail.text.match(/https?:\/\/\S+\/verify-email\?token=([a-f\d]{64})/) || [])[1];
 };
 
@@ -58,23 +63,24 @@ const acct = (name, fn) => test(name, { skip: !enabled }, fn);
 async function signUp(prefix) {
   const username = `${prefix}${crypto.randomBytes(3).toString('hex')}`;
   const agent = request.agent(app);
-  const r = await agent.post('/api/auth/signup').send({ username, name: prefix, email: `${username}@example.test`, password });
+  const email = `${username}@example.test`;
+  const r = await agent.post('/api/auth/signup').send({ username, name: prefix, email, password });
   assert.equal(r.status, 201, JSON.stringify(r.body));
-  await waitForMail();
-  return { agent, username, id: r.body.user.id };
+  await waitForMail(email);
+  return { agent, username, email, id: r.body.user.id };
 }
 
 acct('signing up sends a confirmation link and the account starts unconfirmed', async () => {
-  const { id } = await signUp('verify');
-  assert.equal(sent.length, 1);
-  assert.match(sent[0].subject, /confirm your email/i);
-  assert.ok(lastLink(), 'the email carries a token');
+  const { id, email } = await signUp('verify');
+  assert.equal(mailTo(email).length, 1);
+  assert.match(mailTo(email)[0].subject, /confirm your email/i);
+  assert.ok(linkFor(email), 'the email carries a token');
   assert.equal((await User.findById(id)).emailVerifiedAt, null);
 });
 
 acct('following the link confirms the address, and following it again is not an error', async () => {
-  const { id } = await signUp('once');
-  const token = lastLink();
+  const { id, email } = await signUp('once');
+  const token = linkFor(email);
 
   const first = await request(app).post('/api/auth/verify-email').send({ token });
   assert.equal(first.status, 200, JSON.stringify(first.body));
@@ -95,16 +101,16 @@ acct('a token nobody issued is refused', async () => {
 });
 
 acct('only the hash of a confirmation token is stored', async () => {
-  await signUp('hashed');
-  const token = lastLink();
+  const { email } = await signUp('hashed');
+  const token = linkFor(email);
   const rows = await AuthToken.find({ purpose: 'verify-email' }).lean();
   assert.ok(rows.length);
   for (const row of rows) assert.notEqual(row.tokenHash, token, 'the raw token must not be in the database');
 });
 
 acct('an expired link is refused', async () => {
-  const { id } = await signUp('expired');
-  const token = lastLink();
+  const { id, email } = await signUp('expired');
+  const token = linkFor(email);
   await AuthToken.updateOne({ user: id }, { $set: { expiresAt: new Date(Date.now() - 1000) } });
   const r = await request(app).post('/api/auth/verify-email').send({ token });
   assert.equal(r.status, 400);
@@ -117,8 +123,8 @@ acct('a garbled token is rejected before it reaches the database', async () => {
 });
 
 acct('resending replaces the previous link rather than leaving both usable', async () => {
-  const { agent, id } = await signUp('resend');
-  const first = lastLink();
+  const { agent, id, email } = await signUp('resend');
+  const first = linkFor(email);
 
   const immediate = await agent.post('/api/auth/verify-email/resend').send({});
   assert.equal(immediate.body.sent, false, 'asking again straight away does not mint a second link');
@@ -131,8 +137,8 @@ acct('resending replaces the previous link rather than leaving both usable', asy
   const r = await agent.post('/api/auth/verify-email/resend').send({});
   assert.equal(r.status, 200);
   assert.equal(r.body.sent, true);
-  await waitForMail(2);
-  const second = lastLink();
+  await waitForMail(email, 2);
+  const second = linkFor(email);
   assert.notEqual(second, first);
 
   assert.equal((await request(app).post('/api/auth/verify-email').send({ token: first })).status, 400, 'the old link is dead');
@@ -140,7 +146,7 @@ acct('resending replaces the previous link rather than leaving both usable', asy
 });
 
 acct('changing a password needs the current one and signs out the other devices', async () => {
-  const { agent, username } = await signUp('pw');
+  const { agent, username, email } = await signUp('pw');
 
   // A second device on the same account.
   const other = request.agent(app);
@@ -159,7 +165,7 @@ acct('changing a password needs the current one and signs out the other devices'
 
   assert.equal((await other.get('/api/auth/me')).body.user, null, 'the other device is signed out');
   assert.equal((await agent.get('/api/auth/me')).body.user?.username, username, 'the device that changed it stays in');
-  assert.match(sent.at(-1).subject, /password was changed/i);
+  assert.match(mailTo(email).at(-1).subject, /password was changed/i);
 
   assert.equal((await request(app).post('/api/auth/login').send({ identifier: username, password })).status, 401);
   assert.equal((await request(app).post('/api/auth/login').send({ identifier: username, password: 'A-brand-new-password-2026' })).status, 200);
@@ -172,7 +178,7 @@ acct('deleting an account needs the password and the typed confirmation', async 
 });
 
 acct('deleting an account erases the content it owned and signs the session out', async () => {
-  const { agent, id } = await signUp('erase');
+  const { agent, id, email } = await signUp('erase');
   await User.updateOne({ _id: id }, { $set: { account: 'premium' } });
 
   const folder = (await agent.post('/api/folders').send({ title: 'Going away', visibility: 'private' })).body.folder;
@@ -195,7 +201,7 @@ acct('deleting an account erases the content it owned and signs the session out'
   assert.equal(await Relationship.countDocuments({ $or: [{ from: id }, { to: id }] }), 0);
 
   assert.equal((await agent.get('/api/auth/me')).body.user, null, 'the cookie is cleared');
-  assert.match(sent.at(-1).subject, /account has been deleted/i);
+  assert.match(mailTo(email).at(-1).subject, /account has been deleted/i);
 });
 
 acct('a payment record survives deletion with the personal details stripped out', async () => {
@@ -234,6 +240,48 @@ acct('deletion is refused while others are still in a classroom you own', async 
   await TeamMember.deleteOne({ team: team.id, user: studentId });
   assert.equal((await ownerAgent.delete('/api/auth/account').send({ password, confirm: 'delete my account' })).status, 200);
   assert.equal(await Team.findById(team.id), null);
+});
+
+acct('signing in never grants staff access, whatever the username is', async () => {
+  // This account name used to be promoted to superadmin on login, which made staff access
+  // self-service on any deploy where the seed had not already claimed the name.
+  const username = 'demolearner';
+  await User.create({ username, name: 'Demo', email: 'demo@example.test', passwordHash: await bcrypt.hash(password, 12) });
+
+  const agent = request.agent(app);
+  assert.equal((await agent.post('/api/auth/login').send({ identifier: username, password })).status, 200);
+  assert.equal((await User.findOne({ username })).account, 'normal', 'still an ordinary account');
+  assert.equal((await agent.get('/api/admin/users')).status, 403, 'and the dashboard stays shut');
+});
+
+acct('the usernames that would pass for staff cannot be registered', async () => {
+  for (const username of ['admin', 'superadmin', 'support', 'security', 'billing', 'demolearner', BRAND.slug]) {
+    const r = await request(app).post('/api/auth/signup')
+      .send({ username, name: 'Chancer', email: `${username}-taken@example.test`, password });
+    assert.equal(r.status, 400, `${username} should be reserved`);
+    assert.match(r.body.error, /reserved/i);
+  }
+  // An ordinary name that merely contains one of them is still fine.
+  const ok = await request(app).post('/api/auth/signup').send({ username: 'admirer', name: 'Fine', email: 'admirer@example.test', password });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+});
+
+acct('money cannot change hands until the address is confirmed', async () => {
+  const { agent, id, email } = await signUp('buyer');
+  const billing = { plan: 'monthly', name: 'A Buyer', email: 'buyer@example.test', phone: '9999999999', country: 'India', address: '1 Somewhere Street' };
+
+  const blocked = await agent.post('/api/premium/checkout').send(billing);
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.code, 'EMAIL_UNVERIFIED');
+
+  // Anyone can sign up with somebody else's address, so a receipt or refund has to be able to
+  // reach the person who actually paid.
+  const token = linkFor(email);
+  assert.equal((await request(app).post('/api/auth/verify-email').send({ token })).status, 200);
+  assert.ok((await User.findById(id)).emailVerifiedAt);
+
+  const allowed = await agent.post('/api/premium/checkout').send(billing);
+  assert.notEqual(allowed.status, 403, JSON.stringify(allowed.body));
 });
 
 acct('the rate limit is still on when the suite is not the one asking', async () => {

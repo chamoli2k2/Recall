@@ -21,7 +21,8 @@ before(async () => {
   await Promise.all(allModels.map(m => m.init())); app = createApp();
   [owner, editor, outsider] = [request.agent(app), request.agent(app), request.agent(app)];
   for (const [agent, username] of [[owner, 'owner'], [editor, 'editor'], [outsider, 'outsider']]) { const r = await agent.post('/api/auth/signup').send({ username, name: username, email: `${username}@example.test`, password }); assert.equal(r.status, 201, JSON.stringify(r.body)); }
-  await User.updateMany({}, { $set: { account: 'premium' } });
+  // Paying needs a confirmed address; these tests are about what happens after that, not about it.
+  await User.updateMany({}, { $set: { account: 'premium', emailVerifiedAt: new Date() } });
   const f = await owner.post('/api/folders').send({ title: 'Concurrency', visibility: 'private' }); assert.equal(f.status, 201); folderId = f.body.folder.id;
   const c = await owner.post(`/api/folders/${folderId}/cards`).send({ front: { text: 'Q' }, back: { text: 'A' } }); assert.equal(c.status, 201); cardId = c.body.card.id;
 });
@@ -180,7 +181,7 @@ integration('a classroom: seats are sold, a seat unlocks Premium only inside the
     const r = await agent.post('/api/auth/signup').send({ username, name: username, email: `${username}@example.test`, password });
     assert.equal(r.status, 201, JSON.stringify(r.body));
   }
-  await User.updateMany({ username: { $in: ['teach', 'alice', 'bob'] } }, { $set: { account: 'normal', premiumPlan: '', premiumExpiresAt: null } });
+  await User.updateMany({ username: { $in: ['teach', 'alice', 'bob'] } }, { $set: { account: 'normal', premiumPlan: '', premiumExpiresAt: null, emailVerifiedAt: new Date() } });
 
   const made = await teacher.post('/api/teams').send({ name: 'Physics 101', kind: 'classroom', description: 'Year one mechanics' });
   assert.equal(made.status, 201, JSON.stringify(made.body));

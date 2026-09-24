@@ -416,7 +416,10 @@ html[data-theme=dark] .sub-pill.is-active{background:#1f3b2c;color:#7fd3a3}html[
 .verify-page .button{margin-top:8px}
 .verify-icon{display:inline-flex;align-items:center;justify-content:center;width:62px;height:62px;border-radius:50%;background:#eef7f2;color:#2c7a4f}
 .verify-icon-bad{background:#fdf1f4;color:#c2485f}
-html[data-theme=dark] .settings-lede,html[data-theme=dark] .verify-page p{color:var(--text-3)}
+.premium-unverified{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px 0 4px}
+.premium-unverified h2{margin:0;font-size:19px;letter-spacing:-.5px}
+.premium-unverified p{margin:0;max-width:390px;font-size:14px;line-height:1.65;color:#796a85}
+html[data-theme=dark] .settings-lede,html[data-theme=dark] .verify-page p,html[data-theme=dark] .premium-unverified p{color:var(--text-3)}
 html[data-theme=dark] .settings-status{border-color:#5a4726;background:#3a2f1c;color:#e8bb7c}
 html[data-theme=dark] .settings-status-good{border-color:#2f5040;background:#22382e;color:#94c9bb}
 html[data-theme=dark] .settings-danger{border-color:#5f3340}

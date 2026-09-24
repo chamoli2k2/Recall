@@ -2,9 +2,17 @@ import { z } from 'zod';
 import { hasCloze } from '../../../shared/cloze.js';
 import { PLAN_IDS } from '../../../shared/account.js';
 import { TEAM_PLAN_IDS, SEATS } from '../../../shared/teams.js';
+import { BRAND } from '../../../shared/brand.js';
 export const idSchema = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid identifier');
 export const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/, 'Use 3–24 letters, numbers, or underscores');
-export const signupSchema = z.object({ username: usernameSchema, name: z.string().trim().min(1).max(60), email: z.email().toLowerCase(), password: z.string().min(10).max(128) });
+/**
+ * Names that would let a stranger pass for staff, for the product itself, or for the seeded demo
+ * account. Enforced at signup only, so the people and scripts that already hold one stay reachable
+ * by username everywhere else.
+ */
+const RESERVED = new Set(['admin', 'administrator', 'superadmin', 'sysadmin', 'root', 'system', 'staff', 'moderator', 'support', 'help', 'helpdesk', 'security', 'abuse', 'billing', 'payments', 'noreply', 'no_reply', 'official', 'team', 'demo', 'demolearner', BRAND.slug]);
+export const reservedUsername = name => RESERVED.has(String(name).trim().toLowerCase());
+export const signupSchema = z.object({ username: usernameSchema.refine(v => !RESERVED.has(v), 'That username is reserved. Please pick another.'), name: z.string().trim().min(1).max(60), email: z.email().toLowerCase(), password: z.string().min(10).max(128) });
 export const passwordChangeSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(10).max(128) });
 export const deleteAccountSchema = z.object({ password: z.string().min(1).max(128), confirm: z.literal('delete my account') });
 export const verifyEmailSchema = z.object({ token: z.string().regex(/^[a-f\d]{64}$/i, 'That confirmation link is not valid.') });

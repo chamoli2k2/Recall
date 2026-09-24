@@ -28,6 +28,21 @@ function readCredentials() {
   };
 }
 
+/**
+ * The demo account exists to be handed out, so it gets Premium to show the paid features and
+ * nothing more. Staff access has to be asked for by name, because an account whose password lives
+ * in a file should never be able to read everyone's payment details.
+ */
+const seedAccount = process.env.SEED_ACCOUNT || 'premium';
+if (!['normal', 'premium', 'admin', 'superadmin'].includes(seedAccount)) {
+  throw new Error(`SEED_ACCOUNT must be normal, premium, admin, or superadmin (got "${seedAccount}").`);
+}
+// Staff access is refused outright on a live host. This password is written to a file and handed
+// out, so no configuration mistake should be able to turn it into a key to everyone's data.
+if (process.env.NODE_ENV === 'production' && ['admin', 'superadmin'].includes(seedAccount)) {
+  throw new Error('The demo account cannot be staff in production. Promote a real account from the dashboard instead.');
+}
+
 if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== '1') {
   throw new Error('Sample seeding is for development. Set ALLOW_DEMO_SEED=1 to run against production.');
 }
@@ -47,7 +62,7 @@ if (!user) {
     email: creds.email,
     bio: 'Public demo collections you can browse without signing in.',
     passwordHash,
-    account: 'superadmin',
+    account: seedAccount,
   });
   console.log(`Demo account created: @${creds.username}`);
 } else {
@@ -55,7 +70,7 @@ if (!user) {
   user.email = creds.email;
   user.bio = user.bio || 'Public demo collections you can browse without signing in.';
   user.passwordHash = passwordHash;
-  user.account = 'superadmin';
+  user.account = seedAccount;
   await user.save();
   console.log(`Demo account updated: @${creds.username}`);
 }
