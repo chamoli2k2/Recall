@@ -1,0 +1,259 @@
+import test, { before, after, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import mongoose from 'mongoose';
+import request from 'supertest';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { createApp } from '../src/app.js';
+import {
+  allModels, User, Session, AuthToken, Folder, Card, Progress, Review, Project,
+  Notification, Relationship, PremiumOrder, Team, TeamMember,
+} from '../src/models/index.js';
+import { _setTransport } from '../src/services/mailService.js';
+import { BRAND } from '../../shared/brand.js';
+
+const enabled = process.env.RUN_INTEGRATION === '1';
+let mongo, app;
+const password = 'Account-tests-password-2026';
+/** Captures what would have gone out, and hands back the link so a test can follow it. */
+const sent = [];
+/**
+ * Signup does not wait for the mail to go out, because a slow SMTP server must not slow down
+ * creating an account. Tests therefore wait for it rather than assuming it already landed.
+ */
+const waitForMail = async (count = 1, timeoutMs = 2000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (sent.length < count && Date.now() < deadline) await new Promise(r => setTimeout(r, 10));
+  assert.ok(sent.length >= count, `expected ${count} email(s), saw ${sent.length}`);
+  return sent.at(-1);
+};
+const lastLink = () => {
+  const mail = sent.at(-1);
+  return mail && (mail.text.match(/https?:\/\/\S+\/verify-email\?token=([a-f\d]{64})/) || [])[1];
+};
+
+before(async () => {
+  if (!enabled) return;
+  process.env.SMTP_HOST = 'test.invalid';
+  // Every request here comes from one IP, and the suite makes far more auth calls than a person would.
+  process.env.DISABLE_RATE_LIMIT = '1';
+  _setTransport({ sendMail: async mail => { sent.push(mail); return { messageId: 'test' }; } });
+  const dbName = `${BRAND.slug}_acct_${crypto.randomBytes(6).toString('hex')}`;
+  if (!process.env.TEST_MONGODB_URI) mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
+  await mongoose.connect(process.env.TEST_MONGODB_URI || mongo.getUri(), { dbName });
+  await Promise.all(allModels.map(m => m.init()));
+  app = createApp();
+});
+after(async () => {
+  if (mongoose.connection.readyState) { await mongoose.connection.dropDatabase(); await mongoose.disconnect(); }
+  if (mongo) await mongo.stop();
+  delete process.env.SMTP_HOST;
+  delete process.env.DISABLE_RATE_LIMIT;
+});
+beforeEach(() => { sent.length = 0; });
+
+const acct = (name, fn) => test(name, { skip: !enabled }, fn);
+
+/** A signed-in agent with a unique username, so tests do not collide on the unique index. */
+async function signUp(prefix) {
+  const username = `${prefix}${crypto.randomBytes(3).toString('hex')}`;
+  const agent = request.agent(app);
+  const r = await agent.post('/api/auth/signup').send({ username, name: prefix, email: `${username}@example.test`, password });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  await waitForMail();
+  return { agent, username, id: r.body.user.id };
+}
+
+acct('signing up sends a confirmation link and the account starts unconfirmed', async () => {
+  const { id } = await signUp('verify');
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].subject, /confirm your email/i);
+  assert.ok(lastLink(), 'the email carries a token');
+  assert.equal((await User.findById(id)).emailVerifiedAt, null);
+});
+
+acct('following the link confirms the address, and following it again is not an error', async () => {
+  const { id } = await signUp('once');
+  const token = lastLink();
+
+  const first = await request(app).post('/api/auth/verify-email').send({ token });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  const confirmedAt = (await User.findById(id)).emailVerifiedAt;
+  assert.ok(confirmedAt, 'now confirmed');
+  assert.ok((await AuthToken.findOne({ user: id })).usedAt, 'the token is spent');
+
+  // A double-click, a reload, or a mail scanner prefetching the link must not look like a failure.
+  const again = await request(app).post('/api/auth/verify-email').send({ token });
+  assert.equal(again.status, 200);
+  assert.deepEqual((await User.findById(id)).emailVerifiedAt, confirmedAt, 'and it is not re-stamped');
+});
+
+acct('a token nobody issued is refused', async () => {
+  const r = await request(app).post('/api/auth/verify-email').send({ token: 'a'.repeat(64) });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /not valid/i);
+});
+
+acct('only the hash of a confirmation token is stored', async () => {
+  await signUp('hashed');
+  const token = lastLink();
+  const rows = await AuthToken.find({ purpose: 'verify-email' }).lean();
+  assert.ok(rows.length);
+  for (const row of rows) assert.notEqual(row.tokenHash, token, 'the raw token must not be in the database');
+});
+
+acct('an expired link is refused', async () => {
+  const { id } = await signUp('expired');
+  const token = lastLink();
+  await AuthToken.updateOne({ user: id }, { $set: { expiresAt: new Date(Date.now() - 1000) } });
+  const r = await request(app).post('/api/auth/verify-email').send({ token });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /expired/i);
+});
+
+acct('a garbled token is rejected before it reaches the database', async () => {
+  const r = await request(app).post('/api/auth/verify-email').send({ token: 'not-a-token' });
+  assert.equal(r.status, 400);
+});
+
+acct('resending replaces the previous link rather than leaving both usable', async () => {
+  const { agent, id } = await signUp('resend');
+  const first = lastLink();
+
+  const immediate = await agent.post('/api/auth/verify-email/resend').send({});
+  assert.equal(immediate.body.sent, false, 'asking again straight away does not mint a second link');
+  assert.equal(immediate.body.reason, 'too-soon');
+
+  // Age the link past the resend gap. This goes through the driver because Mongoose treats
+  // `createdAt` as immutable and would quietly drop the change.
+  await AuthToken.collection.updateOne({ user: new mongoose.Types.ObjectId(id) }, { $set: { createdAt: new Date(Date.now() - 120000) } });
+
+  const r = await agent.post('/api/auth/verify-email/resend').send({});
+  assert.equal(r.status, 200);
+  assert.equal(r.body.sent, true);
+  await waitForMail(2);
+  const second = lastLink();
+  assert.notEqual(second, first);
+
+  assert.equal((await request(app).post('/api/auth/verify-email').send({ token: first })).status, 400, 'the old link is dead');
+  assert.equal((await request(app).post('/api/auth/verify-email').send({ token: second })).status, 200);
+});
+
+acct('changing a password needs the current one and signs out the other devices', async () => {
+  const { agent, username } = await signUp('pw');
+
+  // A second device on the same account.
+  const other = request.agent(app);
+  assert.equal((await other.post('/api/auth/login').send({ identifier: username, password })).status, 200);
+  assert.equal((await other.get('/api/auth/me')).body.user?.username, username);
+
+  const wrong = await agent.post('/api/auth/password').send({ currentPassword: 'not-the-password', newPassword: 'A-brand-new-password-2026' });
+  assert.equal(wrong.status, 400);
+
+  const same = await agent.post('/api/auth/password').send({ currentPassword: password, newPassword: password });
+  assert.equal(same.status, 400, 'reusing the current password is refused');
+
+  const ok = await agent.post('/api/auth/password').send({ currentPassword: password, newPassword: 'A-brand-new-password-2026' });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.signedOutElsewhere, 1);
+
+  assert.equal((await other.get('/api/auth/me')).body.user, null, 'the other device is signed out');
+  assert.equal((await agent.get('/api/auth/me')).body.user?.username, username, 'the device that changed it stays in');
+  assert.match(sent.at(-1).subject, /password was changed/i);
+
+  assert.equal((await request(app).post('/api/auth/login').send({ identifier: username, password })).status, 401);
+  assert.equal((await request(app).post('/api/auth/login').send({ identifier: username, password: 'A-brand-new-password-2026' })).status, 200);
+});
+
+acct('deleting an account needs the password and the typed confirmation', async () => {
+  const { agent } = await signUp('guard');
+  assert.equal((await agent.delete('/api/auth/account').send({ password, confirm: 'nope' })).status, 400);
+  assert.equal((await agent.delete('/api/auth/account').send({ password: 'wrong', confirm: 'delete my account' })).status, 400);
+});
+
+acct('deleting an account erases the content it owned and signs the session out', async () => {
+  const { agent, id } = await signUp('erase');
+  await User.updateOne({ _id: id }, { $set: { account: 'premium' } });
+
+  const folder = (await agent.post('/api/folders').send({ title: 'Going away', visibility: 'private' })).body.folder;
+  const card = (await agent.post(`/api/folders/${folder.id}/cards`).send({ front: { text: 'Q' }, back: { text: 'A' } })).body.card;
+  await agent.post('/api/reviews').send({ cardId: card.id, rating: 'good', requestId: crypto.randomUUID() });
+  await agent.post('/api/projects').send({ title: 'Also going', visibility: 'private' });
+
+  const gone = await agent.delete('/api/auth/account').send({ password, confirm: 'delete my account' });
+  assert.equal(gone.status, 200, JSON.stringify(gone.body));
+
+  assert.equal(await User.findById(id), null);
+  assert.equal(await Folder.countDocuments({ owner: id }), 0);
+  assert.equal(await Card.countDocuments({ folder: folder.id }), 0);
+  assert.equal(await Progress.countDocuments({ user: id }), 0);
+  assert.equal(await Review.countDocuments({ user: id }), 0);
+  assert.equal(await Project.countDocuments({ owner: id }), 0);
+  assert.equal(await Session.countDocuments({ user: id }), 0);
+  assert.equal(await AuthToken.countDocuments({ user: id }), 0);
+  assert.equal(await Notification.countDocuments({ user: id }), 0);
+  assert.equal(await Relationship.countDocuments({ $or: [{ from: id }, { to: id }] }), 0);
+
+  assert.equal((await agent.get('/api/auth/me')).body.user, null, 'the cookie is cleared');
+  assert.match(sent.at(-1).subject, /account has been deleted/i);
+});
+
+acct('a payment record survives deletion with the personal details stripped out', async () => {
+  const { agent, id } = await signUp('paid');
+  await PremiumOrder.create({
+    user: id, plan: 'monthly', name: 'Real Name', email: 'real@example.test', phone: '9999999999',
+    country: 'India', address: '1 Somewhere Street', amount: 19900, status: 'approved',
+  });
+
+  assert.equal((await agent.delete('/api/auth/account').send({ password, confirm: 'delete my account' })).status, 200);
+
+  const order = await PremiumOrder.findOne({ user: id }).lean();
+  assert.ok(order, 'the proof of payment is still there');
+  assert.equal(order.amount, 19900, 'the amount is untouched');
+  assert.equal(order.name, 'Deleted account');
+  assert.equal(order.phone, '');
+  assert.equal(order.address, '');
+  assert.notEqual(order.email, 'real@example.test');
+});
+
+acct('deletion is refused while others are still in a classroom you own', async () => {
+  const { agent: ownerAgent, id: ownerId } = await signUp('teacher');
+  const { id: studentId } = await signUp('student');
+  await User.updateOne({ _id: ownerId }, { $set: { account: 'premium' } });
+
+  const team = await Team.create({ name: 'Physics 101', owner: ownerId, seats: 5, memberCount: 2 });
+  await TeamMember.create({ team: team.id, user: ownerId, role: 'owner' });
+  await TeamMember.create({ team: team.id, user: studentId, role: 'student' });
+
+  const blocked = await ownerAgent.delete('/api/auth/account').send({ password, confirm: 'delete my account' });
+  assert.equal(blocked.status, 409);
+  assert.match(blocked.body.error, /Physics 101/);
+  assert.ok(await User.findById(ownerId), 'still there');
+
+  // Once the classroom is empty the account can go, and the classroom goes with it.
+  await TeamMember.deleteOne({ team: team.id, user: studentId });
+  assert.equal((await ownerAgent.delete('/api/auth/account').send({ password, confirm: 'delete my account' })).status, 200);
+  assert.equal(await Team.findById(team.id), null);
+});
+
+acct('the rate limit is still on when the suite is not the one asking', async () => {
+  delete process.env.DISABLE_RATE_LIMIT;
+  try {
+    let limited = false;
+    for (let i = 0; i < 40 && !limited; i++) {
+      const r = await request(app).post('/api/auth/login').send({ identifier: 'nobody', password: 'wrong-password-here' });
+      limited = r.status === 429;
+    }
+    assert.ok(limited, 'guessing at passwords gets cut off');
+  } finally {
+    process.env.DISABLE_RATE_LIMIT = '1';
+  }
+});
+
+acct('someone else cannot change your password or delete your account', async () => {
+  const { id } = await signUp('victim');
+  const stranger = request.agent(app);
+  assert.equal((await stranger.post('/api/auth/password').send({ currentPassword: password, newPassword: 'Another-password-2026' })).status, 401);
+  assert.equal((await stranger.delete('/api/auth/account').send({ password, confirm: 'delete my account' })).status, 401);
+  assert.ok(await User.findById(id));
+});

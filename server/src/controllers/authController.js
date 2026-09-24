@@ -4,10 +4,21 @@ import { createSession, hashToken, cookieOptions, sessionToken } from '../middle
 import { sessionCookieNames } from '../../../shared/brand.js';
 import { assert } from '../utils/errors.js';
 import { publicProfile as loadProfile, searchUsers } from '../services/socialService.js';
-export const signup = async (req, res) => { const { password, ...body } = req.body; const user = await User.create({ ...body, passwordHash: await bcrypt.hash(password, 12), ...(process.env.NODE_ENV === 'test' ? { account: 'premium' } : {}) }); await createSession(res, user); res.status(201).json({ user: await User.findById(user.id) }); };
+import * as account from '../services/accountService.js';
+export const signup = async (req, res) => { const { password, ...body } = req.body; const user = await User.create({ ...body, passwordHash: await bcrypt.hash(password, 12), ...(process.env.NODE_ENV === 'test' ? { account: 'premium' } : {}) }); await createSession(res, user); account.sendVerification(user).catch(() => {}); res.status(201).json({ user: await User.findById(user.id) }); };
 export const login = async (req, res) => { const identifier = String(req.body.identifier).toLowerCase().trim(); const user = await User.findOne({ $or: [{ username: identifier }, { email: identifier }] }).select('+passwordHash'); assert(user && await bcrypt.compare(req.body.password, user.passwordHash), 401, 'Username or password is incorrect.'); if (user.username === 'demolearner' && user.account !== 'superadmin') { user.account = 'superadmin'; await user.save(); } await createSession(res, user); res.json({ user: await User.findById(user.id) }); };
 export const logout = async (req, res) => { const token = sessionToken(req); if (token) await Session.deleteOne({ tokenHash: hashToken(token) }); const { maxAge, ...options } = cookieOptions(); for (const n of sessionCookieNames) res.clearCookie(n, options); res.json({ ok: true }); };
 export const me = async (req, res) => res.json({ user: req.user ?? null });
 export const profile = async (req, res) => { const user = await User.findByIdAndUpdate(req.user.id, { $set: req.body }, { new: true }); res.json({ user }); };
 export const publicProfile = async (req, res) => res.json(await loadProfile(req.params.username, req.user));
 export const searchPeople = async (req, res) => res.json({ users: await searchUsers(req.query.q, req.user?.id) });
+
+export const resendVerification = async (req, res) => res.json(await account.sendVerification(req.user, { force: false }));
+export const verifyEmail = async (req, res) => res.json({ user: await account.confirmVerification(req.body.token) });
+export const changePassword = async (req, res) => res.json(await account.changePassword(req.user, req.body, sessionToken(req)));
+export const deleteAccount = async (req, res) => {
+  const result = await account.deleteAccount(req.user, req.body);
+  const { maxAge, ...options } = cookieOptions();
+  for (const n of sessionCookieNames) res.clearCookie(n, options);
+  res.json(result);
+};

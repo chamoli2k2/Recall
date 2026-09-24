@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { rateLimit } from 'express-rate-limit';
+import { rateLimit as limiter } from 'express-rate-limit';
 import { z } from 'zod';
 import * as auth from '../controllers/authController.js';
 import * as folders from '../controllers/folderController.js';
@@ -14,13 +14,27 @@ import * as notifications from '../controllers/notificationController.js';
 import * as teams from '../controllers/teamController.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requirePremium, requireDashboard } from '../middleware/account.js';
-import { validate, signupSchema, folderSchema, cardSchema, usernameSchema, idSchema, projectSchema, premiumOrderSchema, teamSchema, teamInviteSchema, joinCodeSchema, assignmentSchema, seatQuoteSchema, teamOrderSchema } from '../middleware/validate.js';
+import { validate, signupSchema, passwordChangeSchema, deleteAccountSchema, verifyEmailSchema, folderSchema, cardSchema, usernameSchema, idSchema, projectSchema, premiumOrderSchema, teamSchema, teamInviteSchema, joinCodeSchema, assignmentSchema, seatQuoteSchema, teamOrderSchema } from '../middleware/validate.js';
 import { asyncHandler as a } from '../utils/errors.js';
+/**
+ * A test suite is one client IP making hundreds of calls, so the limits would fire on the honest
+ * traffic of the suite itself rather than on anything it is checking. Never honoured in production,
+ * so setting the flag on a live host cannot switch the limits off.
+ */
+const limitsOff = () => process.env.DISABLE_RATE_LIMIT === '1' && process.env.NODE_ENV !== 'production';
+const rateLimit = options => limiter({ ...options, skip: limitsOff });
+
 const r = Router(); const authLimit = rateLimit({ windowMs: 15 * 60000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false });
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 r.post('/auth/signup', authLimit, validate(signupSchema), a(auth.signup));
 r.post('/auth/login', authLimit, validate(z.object({ identifier: z.string().min(1).max(254), password: z.string().min(1).max(128) })), a(auth.login));
 r.post('/auth/logout', a(auth.logout)); r.get('/auth/me', a(auth.me));
+// Confirming a link is unauthenticated because the click can land in any browser. The token is the
+// credential, so the limiter is what stops it being guessed at.
+r.post('/auth/verify-email', authLimit, validate(verifyEmailSchema), a(auth.verifyEmail));
+r.post('/auth/verify-email/resend', requireAuth, rateLimit({ windowMs: 15 * 60000, limit: 5 }), a(auth.resendVerification));
+r.post('/auth/password', requireAuth, authLimit, validate(passwordChangeSchema), a(auth.changePassword));
+r.delete('/auth/account', requireAuth, authLimit, validate(deleteAccountSchema), a(auth.deleteAccount));
 r.get('/users', a(auth.searchPeople));
 r.get('/users/:username', a(auth.publicProfile));
 r.post('/users/:username/follow', requireAuth, a(social.follow));

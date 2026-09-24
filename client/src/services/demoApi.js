@@ -2,7 +2,7 @@ import { uuid } from './uuid';
 import { sampleFolders } from '../../../shared/sampleData';
 import { planById } from '../../../shared/account.js';
 import { teamPlanById, clampSeats, seatTopUpPrice } from '../../../shared/teams.js';
-const user = { id: 'demo-user', username: 'gaurav', name: 'Gaurav Prakash', bio: 'Learning something new, one card at a time.', dailyGoal: 20, savedFolders: [], account: 'superadmin' };
+const user = { id: 'demo-user', username: 'gaurav', name: 'Gaurav Prakash', bio: 'Learning something new, one card at a time.', dailyGoal: 20, savedFolders: [], account: 'superadmin', emailVerifiedAt: '2026-09-01T00:00:00.000Z' };
 const collaborators = [{ id: 'demo-alex', name: 'Alex Morgan', username: 'alex' }, { id: 'demo-maya', name: 'Maya Chen', username: 'maya' }];
 // Stand-in roster so the dashboard has something to manage in the preview.
 const inDays = n => new Date(Date.now() + n * 86400000).toISOString();

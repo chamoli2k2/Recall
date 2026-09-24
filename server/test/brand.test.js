@@ -9,7 +9,8 @@ test('the display values all derive from the name', () => {
   assert.ok(BRAND.title.startsWith(BRAND.name));
   assert.ok(BRAND.description.startsWith(BRAND.name));
   assert.ok(BRAND.legalName.startsWith(BRAND.name));
-  for (const address of Object.values(BRAND.email)) assert.ok(address.endsWith(`@${BRAND.domain}`), address);
+  for (const address of Object.values(BRAND.email)) assert.match(address, /^[^@\s]+@[^@\s]+\.[a-z]+$/i, address);
+  assert.ok(BRAND.mailFrom.includes(BRAND.name) && BRAND.mailFrom.includes(BRAND.email.general));
 });
 
 test('the identifiers all derive from the slug', () => {

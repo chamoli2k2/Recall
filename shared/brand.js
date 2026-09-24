@@ -10,6 +10,9 @@
 const name = 'Remio';
 const domain = 'remio.app';
 
+/** Where everything written to the product actually lands today. */
+const contact = 'gauravprakash.dev@gmail.com';
+
 /** Lowercase and safe for cookie names, storage keys, log prefixes, and filenames. */
 const slug = name.toLowerCase();
 
@@ -23,15 +26,22 @@ export const BRAND = {
   legalName: `${name} Learning`,
   city: 'Bengaluru',
   country: 'India',
-  /** Addresses printed on the contact and legal pages. */
+  /**
+   * Addresses printed on the contact and legal pages. They all point at one inbox for now, so the
+   * split is about telling the reader what a message is for rather than about routing. Give each
+   * one its own address on the domain once that inbox is worth splitting up.
+   */
   email: {
-    general: `hello@${domain}`,
-    billing: `billing@${domain}`,
-    privacy: `privacy@${domain}`,
-    security: `security@${domain}`,
+    general: contact,
+    billing: contact,
+    privacy: contact,
+    security: contact,
   },
   /** Shown as the "last updated" date on the terms and privacy pages. */
-  policyUpdated: '23 September 2026',
+  policyUpdated: '25 September 2026',
+
+  /** From header on anything the server sends. MAIL_FROM overrides it per environment. */
+  mailFrom: `${name} <${contact}>`,
 
   sessionCookie: `${slug}_session`,
   /** Keys this app owns in localStorage. */
