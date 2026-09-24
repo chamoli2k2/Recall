@@ -118,7 +118,7 @@ A channel that throws is logged and skipped rather than propagated: a failed not
 
 ### Premium plans and expiry
 
-Plans live in `shared/account.js` (`monthly`, `quarterly`, `yearly`, `lifetime`) and are the same list on both sides, so the checkout, the validator, and the dashboard cannot disagree. The buyer picks one; approval stamps `premiumPlan` and `premiumExpiresAt` on the user, where `premiumExpiryAfter` extends an unexpired subscription instead of truncating it and restarts from today if it already lapsed. `hasPremium` then reads as "the role says premium **and** the window is open", so a lapse closes the gated routes without an admin touching the role, and `requirePremium` picks that up on the next request. A lifetime plan stores no end date. Admins see plan, days remaining, and a colour-coded state per account in the dashboard.
+Plans live in `shared/account.js` (`monthly`, `quarterly`, `halfyearly`, `yearly`) and are the same list on both sides, so the checkout, the validator, and the dashboard cannot disagree. The buyer picks one; approval stamps `premiumPlan` and `premiumExpiresAt` on the user, where `premiumExpiryAfter` extends an unexpired subscription instead of truncating it and restarts from today if it already lapsed. `hasPremium` then reads as "the role says premium **and** the window is open", so a lapse closes the gated routes without an admin touching the role, and `requirePremium` picks that up on the next request. An account with no end date is either staff or somebody holding a plan we no longer sell, and `hasPremium` keeps honouring it. Admins see plan, days remaining, and a colour-coded state per account in the dashboard.
 
 ### Paying
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canAssign, hasPremium, hasDashboard, planById, premiumDaysLeft, premiumExpiryAfter } from '../../shared/account.js';
+import { canAssign, hasPremium, hasDashboard, planById, premiumDaysLeft, premiumExpiryAfter, PREMIUM_PLANS } from '../../shared/account.js';
 test('premium and dashboard flags follow account type', () => {
   assert.equal(hasPremium({ account: 'normal' }), false);
   assert.equal(hasPremium({ account: 'premium' }), true);
@@ -43,5 +43,7 @@ test('buying a plan extends an unexpired subscription instead of truncating it',
   assert.equal(premiumExpiryAfter({ premiumExpiresAt: null }, monthly, now).getTime(), now + 30 * DAY);
   assert.equal(premiumExpiryAfter({ premiumExpiresAt: new Date(now + 100 * DAY) }, monthly, now).getTime(), now + 130 * DAY);
   assert.equal(premiumExpiryAfter({ premiumExpiresAt: new Date(now - 10 * DAY) }, monthly, now).getTime(), now + 30 * DAY, 'a lapsed subscription restarts from today');
-  assert.equal(premiumExpiryAfter({}, planById('lifetime'), now), null);
+  // Every plan on sale runs out; only a legacy grant with no day count has no end date.
+  for (const plan of PREMIUM_PLANS) assert.ok(plan.days > 0, `${plan.id} should have a term`);
+  assert.equal(premiumExpiryAfter({}, { id: 'legacy', days: null }, now), null);
 });

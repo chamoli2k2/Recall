@@ -2,12 +2,16 @@ import { BRAND } from './brand.js';
 export const ACCOUNTS = ['normal', 'premium', 'admin', 'superadmin'];
 const DAY = 86400000;
 
-/** Purchasable plans. `days: null` means the subscription never expires. */
+/**
+ * Purchasable plans. Every one of them runs for a fixed number of days; anything with no end date
+ * is either staff or somebody who bought a plan we no longer sell, which the date maths below
+ * still honours.
+ */
 export const PREMIUM_PLANS = [
   { id: 'monthly', label: 'Monthly', days: 30, price: 199, blurb: 'Try the full toolkit for a month.' },
   { id: 'quarterly', label: 'Quarterly', days: 90, price: 499, blurb: 'Three months for the price of two and a half.' },
+  { id: 'halfyearly', label: 'Half-yearly', days: 180, price: 899, blurb: 'Half a year, at a quarter off the monthly rate.' },
   { id: 'yearly', label: 'Yearly', days: 365, price: 1499, blurb: `The best value if ${BRAND.name} is part of your routine.` },
-  { id: 'lifetime', label: 'Lifetime', days: null, price: 3999, blurb: 'Pay once. Every Premium feature, forever.' },
 ];
 export const PLAN_IDS = PREMIUM_PLANS.map(p => p.id);
 export const planById = id => PREMIUM_PLANS.find(p => p.id === id) || null;

@@ -112,7 +112,6 @@ const termsSections = [
       <h3>When you can get your money back</h3>
       <ul>
         <li><strong>Personal Premium plans:</strong> a full refund within <strong>7 days</strong> of payment, for any reason at all. You do not have to justify it.</li>
-        <li><strong>Lifetime:</strong> a full refund within <strong>14 days</strong>, since it is a larger decision.</li>
         <li><strong>Classroom and team plans:</strong> a full refund within <strong>7 days</strong>, as long as no more than two people besides the owner have taken a seat. Once a class is properly under way, we can only refund the seats nobody has claimed.</li>
         <li><strong>Extra seats</strong> bought part-way through a period stay refundable for 7 days, while they are still unclaimed.</li>
         <li><strong>Something went wrong on our side:</strong> if a feature you paid for was unavailable for a meaningful stretch and we could not fix it, tell us and we will refund or extend your plan, whichever you prefer. This is not limited to 7 days.</li>

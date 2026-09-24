@@ -34,6 +34,8 @@ test('each notification type reads as a sentence with somewhere to go', () => {
   assert.match(describeNotification({ type: 'follow', actor }).title, /Maya Chen followed you/);
   assert.equal(describeNotification({ type: 'connect.request', actor }).href, '/friends');
   assert.match(describeNotification({ type: 'premium.requested', actor, data: { plan: 'yearly' } }).title, /Yearly/);
-  assert.match(describeNotification({ type: 'premium.approved', data: { plan: 'lifetime' } }).body, /never expires/);
+  // A grant with no end date, such as a plan we no longer sell, still reads sensibly.
+  assert.match(describeNotification({ type: 'premium.approved', data: { plan: 'legacy' } }).body, /never expires/);
+  assert.match(describeNotification({ type: 'premium.approved', data: { plan: 'halfyearly', expiresAt: '2027-01-01' } }).body, /Renews or ends/);
   assert.equal(describeNotification({ type: 'premium.declined', data: {} }).href, '/premium');
 });

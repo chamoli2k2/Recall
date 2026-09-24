@@ -10,7 +10,7 @@ let staff = [
   { id: user.id, username: user.username, name: user.name, email: 'gaurav@demo.test', account: user.account, plan: '', planLabel: '', expiresAt: null, daysLeft: null },
   { id: 'demo-alex', username: 'alex', name: 'Alex Morgan', email: 'alex@demo.test', account: 'premium', plan: 'yearly', planLabel: 'Yearly', expiresAt: inDays(281), daysLeft: 281 },
   { id: 'demo-maya', username: 'maya', name: 'Maya Chen', email: 'maya@demo.test', account: 'admin', plan: '', planLabel: '', expiresAt: null, daysLeft: null },
-  { id: 'demo-ada', username: 'ada', name: 'Ada Lovelace', email: 'ada@demo.test', account: 'premium', plan: 'lifetime', planLabel: 'Lifetime', expiresAt: null, daysLeft: null },
+  { id: 'demo-ada', username: 'ada', name: 'Ada Lovelace', email: 'ada@demo.test', account: 'premium', plan: 'halfyearly', planLabel: 'Half-yearly', expiresAt: inDays(151), daysLeft: 151 },
   { id: 'demo-linus', username: 'linus', name: 'Linus Berg', email: 'linus@demo.test', account: 'premium', plan: 'monthly', planLabel: 'Monthly', expiresAt: inDays(4), daysLeft: 4 },
   { id: 'demo-sara', username: 'sara', name: 'Sara Iyer', email: 'sara@demo.test', account: 'premium', plan: 'quarterly', planLabel: 'Quarterly', expiresAt: inDays(-12), daysLeft: -12 },
   { id: 'demo-tom', username: 'tom', name: 'Tom Rivera', email: 'tom@demo.test', account: 'normal', plan: '', planLabel: '', expiresAt: null, daysLeft: null },

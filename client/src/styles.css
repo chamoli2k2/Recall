@@ -402,6 +402,10 @@ html[data-theme=dark] .sub-pill.is-active{background:#1f3b2c;color:#7fd3a3}html[
 
 /* Account settings: email confirmation, password change, and deletion. Appended last so the base
    rules here are not undercut by the earlier .settings-panel declarations. */
+/* Preferences on the left, the account itself on the right: two short columns read better than
+   one long ribbon, and the page no longer trails off into empty space on a wide screen. */
+.settings-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,372px);align-items:start;gap:18px;max-width:1030px}
+.settings-layout .settings-panel{max-width:none}
 .settings-panel+.settings-panel{margin-top:18px}
 .settings-panel>h2{margin:0;font-size:17px;letter-spacing:-.3px}
 .settings-lede{margin:7px 0 17px;font-size:13px;line-height:1.6;color:#796a85}
@@ -419,6 +423,8 @@ html[data-theme=dark] .sub-pill.is-active{background:#1f3b2c;color:#7fd3a3}html[
 .premium-unverified{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px 0 4px}
 .premium-unverified h2{margin:0;font-size:19px;letter-spacing:-.5px}
 .premium-unverified p{margin:0;max-width:390px;font-size:14px;line-height:1.65;color:#796a85}
+/* The sidebar eats ~260px, so the second column only earns its place on a genuinely wide window. */
+@media(max-width:1279px){.settings-layout{grid-template-columns:minmax(0,1fr);max-width:620px}}
 html[data-theme=dark] .settings-lede,html[data-theme=dark] .verify-page p,html[data-theme=dark] .premium-unverified p{color:var(--text-3)}
 html[data-theme=dark] .settings-status{border-color:#5a4726;background:#3a2f1c;color:#e8bb7c}
 html[data-theme=dark] .settings-status-good{border-color:#2f5040;background:#22382e;color:#94c9bb}

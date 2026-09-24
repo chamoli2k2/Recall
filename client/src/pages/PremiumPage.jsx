@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Crown, Check, QrCode, Copy, Clock3, Sparkles, Infinity as Forever, Zap } from 'lucide-react';
+import { Crown, Check, QrCode, Copy, Clock3, Sparkles, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { useApp, useQuery } from '../hooks/useApp';
@@ -9,7 +9,7 @@ import { hasPremium, PREMIUM_FEATURES, PREMIUM_PLANS, planById } from '../../../
 import { BRAND } from '../../../shared/brand.js';
 const UPI_ID = 'your-upi-id@bank';
 const money = n => `₹${n.toLocaleString('en-IN')}`;
-const perMonth = plan => plan.days ? `${money(Math.round(plan.price / (plan.days / 30)))}/mo` : 'one payment';
+const perMonth = plan => `${money(Math.round(plan.price / (plan.days / 30)))}/mo`;
 
 /** The UPI instructions and the gateway reassurance, chosen by whichever method is selected. */
 export function PaymentAside({ method, amount, steps }) {
@@ -67,9 +67,9 @@ export default function PremiumPage() {
         <div className="premium-card-head"><h2>Choose a plan</h2><p>Every plan unlocks the same features. Longer plans simply cost less per month.</p></div>
         <div className="plan-picker" role="radiogroup" aria-label="Premium plan">{PREMIUM_PLANS.map(p => <label key={p.id} className={`plan-option ${plan === p.id ? 'is-chosen' : ''}`}>
           <input type="radio" name="plan" value={p.id} checked={plan === p.id} onChange={() => setPlan(p.id)}/>
-          <span className="plan-top"><strong>{p.label}</strong>{p.id === 'yearly' && <span className="plan-tag">Popular</span>}{p.days == null && <Forever size={15}/>}</span>
+          <span className="plan-top"><strong>{p.label}</strong>{p.id === 'yearly' && <span className="plan-tag">Popular</span>}</span>
           <span className="plan-price">{money(p.price)}</span>
-          <span className="plan-term">{p.days ? `${p.days} days · ${perMonth(p)}` : 'never expires'}</span>
+          <span className="plan-term">{p.days} days · {perMonth(p)}</span>
           <span className="plan-blurb">{p.blurb}</span>
         </label>)}</div>
         <PaymentForm
