@@ -7,11 +7,12 @@ import { useApp, useQuery } from '../hooks/useApp';
 import { api } from '../services/api';
 import { Button, Field, ErrorState, Loading, Avatar } from '../components/ui';
 import ThemeToggle from '../components/ThemeToggle';
+import ConfirmEmailFirst, { ResendLinkButton } from '../components/ConfirmEmailFirst';
 import { BRAND } from '../../../shared/brand.js';
 export function AuthPage({ mode = 'login' }) {
   const { setUser, error: connectionError } = useApp(); const navigate = useNavigate(); const signup = mode === 'signup'; const setSignup = v => navigate((v ? '/signup' : '/login') + window.location.search, { replace: true }); const [busy, setBusy] = useState(false), [error, setError] = useState('');
   async function submit(e) { e.preventDefault(); setBusy(true); setError(''); const body = Object.fromEntries(new FormData(e.currentTarget)); try { const d = await api(signup ? '/auth/signup' : '/auth/login', { method: 'POST', body }); setUser(d.user); } catch (e) { setError(e.message); } finally { setBusy(false); } }
-  return <div className="auth-page"><div className="auth-story"><Link className="brand" to="/"><img src="/favicon.svg" alt=""/><span className="brand-word">{BRAND.name}<span className="brand-period">.</span></span></Link><div><span className="eyebrow">A SPACE FOR YOUR CURIOSITY</span><h1>Learn a little.<br/>Remember<br/>a lot.</h1><p>Collect what matters. Make it memorable.<br/>Learn better, together.</p><div className="auth-benefits"><span><Check size={17}/> Your notes, beautifully organized</span><span><Check size={17}/> Study at your own pace</span><span><Check size={17}/> Share a little knowledge</span></div></div><span>One card at a time.</span></div><div className="auth-form"><Link to="/" className="back-link auth-back"><ArrowLeft size={15}/> Back to home</Link><ThemeToggle className="auth-theme-toggle"/><div><h2>{signup ? 'Make yourself at home.' : 'Welcome back.'}</h2><p>{signup ? 'Your next chapter starts with a flashcard.' : 'Your learning space is right where you left it.'}</p>{connectionError && <ErrorState message={connectionError}/>}<form className="form-stack" onSubmit={submit}>{signup ? <><Field label="Full name"><input required name="name" maxLength={60} autoComplete="name" placeholder="Your name"/></Field><Field label="Unique username" hint="3–24 letters, numbers, or underscores."><input required name="username" pattern="[a-zA-Z0-9_]{3,24}" autoComplete="username" placeholder="your_username"/></Field><Field label="Email"><input required type="email" name="email" autoComplete="email" placeholder="you@example.com"/></Field></> : <Field label="Username or email"><input required name="identifier" autoComplete="username" placeholder="Your username or email"/></Field>}<Field label="Password" hint={signup ? 'Use at least 10 characters.' : undefined}><input required type="password" name="password" minLength={signup ? 10 : 1} maxLength={128} autoComplete={signup ? 'new-password' : 'current-password'} placeholder="Enter your password"/></Field>{error && <ErrorState message={error}/>}<Button type="submit" className="primary" loading={busy}>{signup ? 'Create your account' : 'Sign in'}<ArrowRight size={17}/></Button></form><p className="auth-switch">{signup ? 'Already have an account?' : `New to ${BRAND.name}?`} <button className="text-button" onClick={() => { setSignup(!signup); setError(''); }}>{signup ? 'Sign in' : 'Create an account'}</button></p></div></div></div>;
+  return <div className="auth-page"><div className="auth-story"><Link className="brand" to="/"><img src="/favicon.svg" alt=""/><span className="brand-word">{BRAND.name}<span className="brand-period">.</span></span></Link><div><span className="eyebrow">A SPACE FOR YOUR CURIOSITY</span><h1>Learn a little.<br/>Remember<br/>a lot.</h1><p>Collect what matters. Make it memorable.<br/>Learn better, together.</p><div className="auth-benefits"><span><Check size={17}/> Your notes, beautifully organized</span><span><Check size={17}/> Study at your own pace</span><span><Check size={17}/> Share a little knowledge</span></div></div><span>One card at a time.</span></div><div className="auth-form"><Link to="/" className="back-link auth-back"><ArrowLeft size={15}/> Back to home</Link><ThemeToggle className="auth-theme-toggle"/><div><h2>{signup ? 'Make yourself at home.' : 'Welcome back.'}</h2><p>{signup ? 'Your next chapter starts with a flashcard.' : 'Your learning space is right where you left it.'}</p>{connectionError && <ErrorState message={connectionError}/>}<form className="form-stack" onSubmit={submit}>{signup ? <><Field label="Full name"><input required name="name" maxLength={60} autoComplete="name" placeholder="Your name"/></Field><Field label="Unique username" hint="3–24 letters, numbers, or underscores."><input required name="username" pattern="[a-zA-Z0-9_]{3,24}" autoComplete="username" placeholder="your_username"/></Field><Field label="Email"><input required type="email" name="email" autoComplete="email" placeholder="you@example.com"/></Field></> : <Field label="Username or email"><input required name="identifier" autoComplete="username" placeholder="Your username or email"/></Field>}<Field label="Password" hint={signup ? 'Use at least 10 characters.' : undefined}><input required type="password" name="password" minLength={signup ? 10 : 1} maxLength={128} autoComplete={signup ? 'new-password' : 'current-password'} placeholder="Enter your password"/></Field>{!signup && <Link className="text-button auth-forgot" to="/forgot-password">Forgot your password?</Link>}{error && <ErrorState message={error}/>}<Button type="submit" className="primary" loading={busy}>{signup ? 'Create your account' : 'Sign in'}<ArrowRight size={17}/></Button></form><p className="auth-switch">{signup ? 'Already have an account?' : `New to ${BRAND.name}?`} <button className="text-button" onClick={() => { setSignup(!signup); setError(''); }}>{signup ? 'Sign in' : 'Create an account'}</button></p></div></div></div>;
 }
 export function SettingsPage() {
   const { user, setUser, refresh, isDemo } = useApp(); const [form, setForm] = useState({ name: user.name, bio: user.bio || '', dailyGoal: user.dailyGoal || 20, desiredRetention: user.desiredRetention || 0.9 }), [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -49,9 +50,74 @@ export function VerifyEmailPage() {
   </div>;
 }
 
+/**
+ * Asks where to send a reset link. The answer never says whether the address is on file, so this
+ * page cannot be used to find out who has an account here.
+ */
+export function ForgotPasswordPage() {
+  const [email, setEmail] = useState(''), [busy, setBusy] = useState(false), [sent, setSent] = useState(false), [error, setError] = useState('');
+  if (sent) return <div className="verify-page">
+    <span className="verify-icon"><MailCheck size={28}/></span>
+    <h1>Check your inbox.</h1>
+    <p>If <strong>{email}</strong> belongs to an account, a link to choose a new password is on its way. It is good for one hour.</p>
+    <Link className="button primary" to="/login">Back to sign in <ArrowRight size={16}/></Link>
+  </div>;
+  return <div className="verify-page">
+    <span className="verify-icon"><LockKeyhole size={28}/></span>
+    <h1>Forgot your password?</h1>
+    <p>Tell us the address on your account and we will send you a link to set a new one.</p>
+    <form className="form-stack verify-form" onSubmit={async e => {
+      e.preventDefault(); setBusy(true); setError('');
+      try { await api('/auth/password/forgot', { method: 'POST', body: { email } }); setSent(true); }
+      catch (e) { setError(e.message); } finally { setBusy(false); }
+    }}>
+      <Field label="Email"><input required type="email" autoComplete="email" maxLength={254} value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"/></Field>
+      {error && <ErrorState message={error}/>}
+      <Button className="primary" type="submit" loading={busy}>Send me a reset link <ArrowRight size={16}/></Button>
+    </form>
+    <Link className="text-button" to="/login">I remembered it, take me back</Link>
+  </div>;
+}
+
+/** The other end of a reset link. Nothing is spent until a new password is actually submitted. */
+export function ResetPasswordPage() {
+  const { setUser } = useApp(); const navigate = useNavigate();
+  const token = new URLSearchParams(window.location.search).get('token') || '';
+  const [password, setPassword] = useState(''), [busy, setBusy] = useState(false), [done, setDone] = useState(false), [error, setError] = useState('');
+  if (!token) return <div className="verify-page">
+    <span className="verify-icon verify-icon-bad"><MailWarning size={28}/></span>
+    <h1>That link is incomplete.</h1>
+    <p>It is missing its reset code. Open the most recent email, or ask for a new link.</p>
+    <Link className="button primary" to="/forgot-password">Ask for a new link <ArrowRight size={16}/></Link>
+  </div>;
+  if (done) return <div className="verify-page">
+    <span className="verify-icon"><Check size={28}/></span>
+    <h1>Your password is set.</h1>
+    <p>Every device that was signed in has been signed out, so sign in again with your new password.</p>
+    <Button className="primary" onClick={() => navigate('/login')}>Sign in <ArrowRight size={16}/></Button>
+  </div>;
+  return <div className="verify-page">
+    <span className="verify-icon"><LockKeyhole size={28}/></span>
+    <h1>Choose a new password.</h1>
+    <p>Setting it signs out every device, including any you do not recognise.</p>
+    <form className="form-stack verify-form" onSubmit={async e => {
+      e.preventDefault(); setBusy(true); setError('');
+      try {
+        await api('/auth/password/reset', { method: 'POST', body: { token, newPassword: password } });
+        // The session this browser held is gone with all the others, so drop the stale user.
+        setUser(null); setDone(true);
+      } catch (e) { setError(e.message); } finally { setBusy(false); }
+    }}>
+      <Field label="New password" hint="Use at least 10 characters."><input required type="password" autoComplete="new-password" minLength={10} maxLength={128} value={password} onChange={e => setPassword(e.target.value)}/></Field>
+      {error && <ErrorState message={error}/>}
+      <Button className="primary" type="submit" loading={busy}>Set my password <Check size={16}/></Button>
+    </form>
+  </div>;
+}
+
 /** Shows whether the address is confirmed, and sends a fresh link if it is not. */
 function EmailPanel() {
-  const { user, refresh } = useApp(); const [busy, setBusy] = useState(false);
+  const { user } = useApp();
   if (user.emailVerifiedAt) return <div className="settings-panel">
     <h2>Your email</h2>
     <p className="settings-lede">Confirmed, so we can reach you if anything happens to your account.</p>
@@ -62,21 +128,20 @@ function EmailPanel() {
     <p className="settings-lede">Confirming your address is what lets us help you recover the account later, and it is needed before your first payment.</p>
     <div className="settings-status-row">
     <span className="settings-status"><MailWarning size={17}/> Not confirmed yet.</span>
-    <Button className="primary" loading={busy} onClick={async () => {
-      setBusy(true);
-      try {
-        const r = await api('/auth/verify-email/resend', { method: 'POST' });
-        if (r.sent) toast.success('Link sent. Check your inbox.');
-        else if (r.reason === 'too-soon') toast('We just sent one. Give it a minute before trying again.');
-        else toast.error(`Email is not set up on this server yet. Write to ${BRAND.email.general} and we will confirm it by hand.`);
-      } catch (e) { toast.error(e.message); } finally { setBusy(false); }
-    }}>Send me a confirmation link</Button>
+    <ResendLinkButton/>
     </div>
   </div>;
 }
 
 function PasswordPanel() {
+  const { user } = useApp();
   const [form, setForm] = useState({ currentPassword: '', newPassword: '' }), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  // The server refuses this until the address is confirmed, because the change is announced by
+  // email and a confirmed address is the way back in if the account is ever taken.
+  if (!user.emailVerifiedAt) return <div className="settings-panel">
+    <h2>Change your password</h2>
+    <ConfirmEmailFirst>We announce a password change by email, and a confirmed address is how you get back into the account if you are ever locked out.</ConfirmEmailFirst>
+  </div>;
   return <div className="settings-panel">
     <h2>Change your password</h2>
     <p className="settings-lede">Changing it signs out every other device, so do this if you think someone else has been in your account.</p>

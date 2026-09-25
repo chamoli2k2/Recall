@@ -16,6 +16,16 @@ export const searchPeople = async (req, res) => res.json({ users: await searchUs
 export const resendVerification = async (req, res) => res.json(await account.sendVerification(req.user, { force: false }));
 export const verifyEmail = async (req, res) => res.json({ user: await account.confirmVerification(req.body.token) });
 export const changePassword = async (req, res) => res.json(await account.changePassword(req.user, req.body, sessionToken(req)));
+// The answer is the same whether or not the address is on file, so nobody can use this to find out
+// who has an account. What actually happened is only ever said in the email itself.
+export const forgotPassword = async (req, res) => { await account.sendPasswordReset(req.body.email); res.json({ ok: true }); };
+export const resetPassword = async (req, res) => {
+  const result = await account.resetPassword(req.body);
+  // Their own cookie was among the sessions just dropped, so clear it rather than leave a dead one.
+  const { maxAge, ...options } = cookieOptions();
+  for (const n of sessionCookieNames) res.clearCookie(n, options);
+  res.json(result);
+};
 export const deleteAccount = async (req, res) => {
   const result = await account.deleteAccount(req.user, req.body);
   const { maxAge, ...options } = cookieOptions();

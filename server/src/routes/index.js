@@ -14,7 +14,7 @@ import * as notifications from '../controllers/notificationController.js';
 import * as teams from '../controllers/teamController.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requirePremium, requireDashboard, requireVerifiedEmail } from '../middleware/account.js';
-import { validate, signupSchema, passwordChangeSchema, deleteAccountSchema, verifyEmailSchema, folderSchema, cardSchema, usernameSchema, idSchema, projectSchema, premiumOrderSchema, teamSchema, teamInviteSchema, joinCodeSchema, assignmentSchema, seatQuoteSchema, teamOrderSchema } from '../middleware/validate.js';
+import { validate, signupSchema, passwordChangeSchema, forgotPasswordSchema, resetPasswordSchema, deleteAccountSchema, verifyEmailSchema, folderSchema, cardSchema, usernameSchema, idSchema, projectSchema, premiumOrderSchema, teamSchema, teamInviteSchema, joinCodeSchema, assignmentSchema, seatQuoteSchema, teamOrderSchema } from '../middleware/validate.js';
 import { asyncHandler as a } from '../utils/errors.js';
 /**
  * A test suite is one client IP making hundreds of calls, so the limits would fire on the honest
@@ -33,7 +33,12 @@ r.post('/auth/logout', a(auth.logout)); r.get('/auth/me', a(auth.me));
 // credential, so the limiter is what stops it being guessed at.
 r.post('/auth/verify-email', authLimit, validate(verifyEmailSchema), a(auth.verifyEmail));
 r.post('/auth/verify-email/resend', requireAuth, rateLimit({ windowMs: 15 * 60000, limit: 5 }), a(auth.resendVerification));
-r.post('/auth/password', requireAuth, authLimit, validate(passwordChangeSchema), a(auth.changePassword));
+// Forgetting a password is the one way back in for somebody locked out, so it stays open to
+// everyone. The link goes to the address on file, which is what makes it safe.
+r.post('/auth/password/forgot', rateLimit({ windowMs: 15 * 60000, limit: 5 }), validate(forgotPasswordSchema), a(auth.forgotPassword));
+r.post('/auth/password/reset', authLimit, validate(resetPasswordSchema), a(auth.resetPassword));
+// A deliberate change is announced by email and needs an address we know reaches them.
+r.post('/auth/password', requireAuth, requireVerifiedEmail, authLimit, validate(passwordChangeSchema), a(auth.changePassword));
 r.delete('/auth/account', requireAuth, authLimit, validate(deleteAccountSchema), a(auth.deleteAccount));
 r.get('/users', a(auth.searchPeople));
 r.get('/users/:username', a(auth.publicProfile));

@@ -32,9 +32,9 @@ const waitForMail = async (to, count = 1, timeoutMs = 2000) => {
   assert.ok(found.length >= count, `expected ${count} email(s) to ${to}, saw ${found.length}`);
   return found.at(-1);
 };
-const linkFor = to => {
+const linkFor = (to, page = 'verify-email') => {
   const mail = mailTo(to).at(-1);
-  return mail && (mail.text.match(/https?:\/\/\S+\/verify-email\?token=([a-f\d]{64})/) || [])[1];
+  return mail && (mail.text.match(new RegExp(`https?://\\S+/${page}\\?token=([a-f\\d]{64})`)) || [])[1];
 };
 
 before(async () => {
@@ -68,6 +68,12 @@ async function signUp(prefix) {
   assert.equal(r.status, 201, JSON.stringify(r.body));
   await waitForMail(email);
   return { agent, username, email, id: r.body.user.id };
+}
+
+/** Follows the emailed link. Anything that announces itself by email needs a confirmed address. */
+async function confirmEmail(email) {
+  const r = await request(app).post('/api/auth/verify-email').send({ token: linkFor(email) });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
 }
 
 acct('signing up sends a confirmation link and the account starts unconfirmed', async () => {
@@ -145,8 +151,16 @@ acct('resending replaces the previous link rather than leaving both usable', asy
   assert.equal((await request(app).post('/api/auth/verify-email').send({ token: second })).status, 200);
 });
 
+acct('changing a password is refused until the address is confirmed', async () => {
+  const { agent } = await signUp('gated');
+  const r = await agent.post('/api/auth/password').send({ currentPassword: password, newPassword: 'A-brand-new-password-2026' });
+  assert.equal(r.status, 403);
+  assert.equal(r.body.code, 'EMAIL_UNVERIFIED');
+});
+
 acct('changing a password needs the current one and signs out the other devices', async () => {
   const { agent, username, email } = await signUp('pw');
+  await confirmEmail(email);
 
   // A second device on the same account.
   const other = request.agent(app);
@@ -169,6 +183,75 @@ acct('changing a password needs the current one and signs out the other devices'
 
   assert.equal((await request(app).post('/api/auth/login').send({ identifier: username, password })).status, 401);
   assert.equal((await request(app).post('/api/auth/login').send({ identifier: username, password: 'A-brand-new-password-2026' })).status, 200);
+});
+
+acct('asking to reset emails a link, and an address nobody owns gets the same answer', async () => {
+  const { email } = await signUp('forgot');
+
+  const mine = await request(app).post('/api/auth/password/forgot').send({ email });
+  assert.equal(mine.status, 200);
+  assert.deepEqual(mine.body, { ok: true });
+  const mail = await waitForMail(email, 2);
+  assert.match(mail.subject, /reset your/i);
+  assert.ok(linkFor(email, 'reset-password'), 'the email carries a reset token');
+
+  // Identical response and no email, so this cannot be used to discover who has an account.
+  const stranger = 'nobody-at-all@example.test';
+  const theirs = await request(app).post('/api/auth/password/forgot').send({ email: stranger });
+  assert.equal(theirs.status, 200);
+  assert.deepEqual(theirs.body, { ok: true });
+  assert.equal(mailTo(stranger).length, 0);
+});
+
+acct('a reset link sets the password, confirms the address, and signs out every device', async () => {
+  const { agent, username, email, id } = await signUp('reset');
+
+  // A second device, and an attacker's stolen session is no different from one.
+  const other = request.agent(app);
+  assert.equal((await other.post('/api/auth/login').send({ identifier: username, password })).status, 200);
+
+  await request(app).post('/api/auth/password/forgot').send({ email });
+  await waitForMail(email, 2);
+  const token = linkFor(email, 'reset-password');
+  const rows = await AuthToken.find({ purpose: 'reset-password' }).lean();
+  for (const row of rows) assert.notEqual(row.tokenHash, token, 'the raw token must not be in the database');
+
+  const fresh = 'A-reset-password-2026';
+  const r = await request(app).post('/api/auth/password/reset').send({ token, newPassword: fresh });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+
+  assert.equal((await request(app).post('/api/auth/login').send({ identifier: username, password })).status, 401, 'the old password is dead');
+  assert.equal((await request(app).post('/api/auth/login').send({ identifier: username, password: fresh })).status, 200);
+
+  assert.equal((await other.get('/api/auth/me')).body.user, null, 'the other device is signed out');
+  assert.equal((await agent.get('/api/auth/me')).body.user, null, 'and so is the one that asked');
+
+  // Reading the link is proof they hold the mailbox, so there is nothing left to confirm.
+  assert.ok((await User.findById(id)).emailVerifiedAt, 'the address is now confirmed');
+  assert.equal(await AuthToken.countDocuments({ user: id }), 0, 'no link is left usable');
+  assert.match(mailTo(email).at(-1).subject, /password was changed/i);
+});
+
+acct('a reset link is spent once, and an expired or invented one is refused', async () => {
+  const { email, id } = await signUp('spent');
+  await request(app).post('/api/auth/password/forgot').send({ email });
+  await waitForMail(email, 2);
+  const token = linkFor(email, 'reset-password');
+
+  assert.equal((await request(app).post('/api/auth/password/reset').send({ token, newPassword: 'A-reset-password-2026' })).status, 200);
+  const again = await request(app).post('/api/auth/password/reset').send({ token, newPassword: 'Another-reset-password-2026' });
+  assert.equal(again.status, 400, 'the same link cannot be used twice');
+  assert.match(again.body.error, /not valid/i);
+
+  const invented = await request(app).post('/api/auth/password/reset').send({ token: 'b'.repeat(64), newPassword: 'A-reset-password-2026' });
+  assert.equal(invented.status, 400);
+  assert.equal((await request(app).post('/api/auth/password/reset').send({ token: 'nope', newPassword: 'A-reset-password-2026' })).status, 400, 'a garbled token stops at validation');
+
+  await request(app).post('/api/auth/password/forgot').send({ email });
+  await waitForMail(email, 4);
+  const stale = linkFor(email, 'reset-password');
+  await AuthToken.updateOne({ user: id, purpose: 'reset-password' }, { $set: { expiresAt: new Date(Date.now() - 1000) } });
+  assert.equal((await request(app).post('/api/auth/password/reset').send({ token: stale, newPassword: 'A-reset-password-2026' })).status, 400);
 });
 
 acct('deleting an account needs the password and the typed confirmation', async () => {

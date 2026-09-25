@@ -68,6 +68,18 @@ export function verificationEmail({ name, url }) {
   };
 }
 
+export function passwordResetEmail({ name, url }) {
+  const lines = [
+    `Hello ${name}, somebody asked to reset the password on your ${BRAND.name} account. Use the link below to choose a new one.`,
+    'The link is good for one hour and can only be used once. Until you use it, your current password keeps working.',
+  ];
+  return {
+    subject: `Reset your ${BRAND.name} password`,
+    text: `${lines.join('\n\n')}\n\n${url}\n\nIf you did not ask for this, you can ignore this message and nothing will change.`,
+    html: layout('Choose a new password', lines, { href: url, label: 'Choose a new password' }),
+  };
+}
+
 export function passwordChangedEmail({ name }) {
   const lines = [
     `Hello ${name}, the password on your ${BRAND.name} account was just changed, and every other signed-in device was signed out.`,

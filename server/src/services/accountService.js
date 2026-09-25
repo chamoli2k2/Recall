@@ -7,10 +7,12 @@ import {
 } from '../models/index.js';
 import { assert } from '../utils/errors.js';
 import { hashToken } from '../middleware/auth.js';
-import { send, verificationEmail, passwordChangedEmail, accountDeletedEmail } from './mailService.js';
+import { send, verificationEmail, passwordResetEmail, passwordChangedEmail, accountDeletedEmail } from './mailService.js';
 import { BRAND } from '../../../shared/brand.js';
 
 const VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
+/** A reset link hands out an account, so it is worth far less time than a confirmation link. */
+const RESET_TTL_MS = 60 * 60 * 1000;
 /** Resending is rate limited at the route; this stops a second link being minted needlessly. */
 const RESEND_GAP_MS = 60 * 1000;
 
@@ -60,6 +62,54 @@ export async function confirmVerification(token) {
   row.usedAt = new Date();
   await row.save();
   return User.findByIdAndUpdate(row.user, { $set: { emailVerifiedAt: new Date() } }, { new: true });
+}
+
+/**
+ * Emails a reset link. The caller is told nothing about whether the address belongs to anybody,
+ * because this route is unauthenticated and would otherwise be a way to test whether someone has
+ * an account here.
+ */
+export async function sendPasswordReset(email) {
+  const user = await User.findOne({ email: String(email).toLowerCase().trim() }).select('+email');
+  if (!user) return { sent: false, reason: 'no-account' };
+
+  await AuthToken.deleteMany({ user: user.id, purpose: 'reset-password' });
+  const token = crypto.randomBytes(32).toString('hex');
+  await AuthToken.create({
+    tokenHash: hashToken(token), user: user.id, purpose: 'reset-password',
+    expiresAt: new Date(Date.now() + RESET_TTL_MS),
+  });
+
+  const url = `${origin()}/reset-password?token=${token}`;
+  const sent = await send({ to: user.email, ...passwordResetEmail({ name: user.name, url }) });
+  return { sent, reason: sent ? 'sent' : 'mail-unavailable' };
+}
+
+/**
+ * Spends a reset link and sets the new password. Every session goes, including the one belonging to
+ * whoever pushed the real owner out, and the address is marked confirmed: reading the link is proof
+ * they hold the mailbox.
+ *
+ * Unlike a deliberate change, this does not refuse a password the account is already using. The
+ * person here has forgotten it, and refusing would quietly confirm a guess to a stranger.
+ */
+export async function resetPassword({ token, newPassword }) {
+  const invalid = 'That reset link is not valid any more. Ask for a new one and use the most recent email.';
+  const row = await AuthToken.findOne({ tokenHash: hashToken(token), purpose: 'reset-password' });
+  assert(row && !row.usedAt && row.expiresAt > new Date(), 400, invalid);
+
+  const user = await User.findById(row.user).select('+passwordHash +email');
+  assert(user, 400, invalid);
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  if (!user.emailVerifiedAt) user.emailVerifiedAt = new Date();
+  await user.save();
+
+  await Session.deleteMany({ user: user.id });
+  await AuthToken.deleteMany({ user: user.id });
+
+  await send({ to: user.email, ...passwordChangedEmail({ name: user.name }) });
+  return { reset: true };
 }
 
 /**

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Crown, ImageUp, ImageOff, ShieldCheck, Zap, Banknote, MailWarning } from 'lucide-react';
+import { Crown, ImageUp, ImageOff, ShieldCheck, Zap, Banknote } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { messageFor, ApiError } from '../services/errors';
 import { loadCheckout } from '../services/razorpay';
 import { useApp } from '../hooks/useApp';
 import { Button, Field, ErrorState } from './ui';
+import ConfirmEmailFirst from './ConfirmEmailFirst';
 import { BRAND } from '../../../shared/brand.js';
 
 const METHOD_ICONS = { razorpay: Zap, manual: Banknote };
@@ -78,20 +79,9 @@ export default function PaymentForm({ methods = [], amount, summary, label = 'Su
 
   // The server refuses a purchase until the address is confirmed. Say so before the billing
   // details are typed out rather than rejecting them afterwards.
-  if (user && !user.emailVerifiedAt) return <div className="premium-form premium-unverified">
-    <span className="verify-icon verify-icon-bad"><MailWarning size={26}/></span>
-    <h2>Confirm your email first</h2>
-    <p>Your receipt goes to the address on your account, so we need to know it reaches you before taking a payment.</p>
-    <Button className="primary" loading={busy} onClick={async () => {
-      setBusy(true);
-      try {
-        const r = await api('/auth/verify-email/resend', { method: 'POST' });
-        if (r.sent) toast.success('Link sent. Check your inbox.');
-        else if (r.reason === 'too-soon') toast('We just sent one. Give it a minute before trying again.');
-        else toast.error(`Email is not set up on this server yet. Write to ${BRAND.email.general} and we will confirm it by hand.`);
-      } catch (e) { toast.error(e.message); } finally { setBusy(false); }
-    }}>Send me a confirmation link</Button>
-  </div>;
+  if (user && !user.emailVerifiedAt) return <ConfirmEmailFirst className="premium-form">
+    Your receipt goes to the address on your account, so we need to know it reaches you before taking a payment.
+  </ConfirmEmailFirst>;
 
   return <form className="premium-form" onSubmit={submit}>
     {methods.length > 1 && <>

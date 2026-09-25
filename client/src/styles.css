@@ -421,6 +421,9 @@ html[data-theme=dark] .sub-pill.is-active{background:#1f3b2c;color:#7fd3a3}html[
 .verify-page h1{margin:0;font-size:26px;letter-spacing:-.9px}
 .verify-page p{margin:0;font-size:14px;line-height:1.65;color:#796a85}
 .verify-page .button{margin-top:8px}
+/* The centred pages read as a column, but a form inside one still wants its fields left-aligned. */
+.verify-form{width:100%;margin-top:10px;text-align:left}
+.auth-forgot{align-self:flex-start;margin-top:-6px;font-size:13px}
 .verify-icon{display:inline-flex;align-items:center;justify-content:center;width:62px;height:62px;border-radius:50%;background:#eef7f2;color:#2c7a4f}
 .verify-icon-bad{background:#fdf1f4;color:#c2485f}
 .premium-unverified{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px 0 4px}
