@@ -14,7 +14,9 @@ const VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
 /** Resending is rate limited at the route; this stops a second link being minted needlessly. */
 const RESEND_GAP_MS = 60 * 1000;
 
-const origin = () => (process.env.CLIENT_ORIGIN || '').split(',')[0].trim() || `https://${BRAND.domain}`;
+// A host pasted from a browser bar usually carries a trailing slash, which would double up against
+// the paths below and leave every emailed link subtly wrong.
+const origin = () => (process.env.CLIENT_ORIGIN || '').split(',')[0].trim().replace(/\/+$/, '') || `https://${BRAND.domain}`;
 
 /**
  * Issues a fresh verification link and emails it. Previous unused links for the address are
