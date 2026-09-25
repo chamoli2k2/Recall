@@ -133,6 +133,9 @@ html[data-theme=dark] .large-folder-icon,html[data-theme=dark] .small-folder-ico
 .home-step h3{font-size:18px;color:var(--ink);margin-bottom:8px}.home-step p{font-size:14px;line-height:1.65;color:var(--text-3)}
 .home-community .library-section-heading{align-items:flex-end;margin-bottom:24px}.home-community .library-section-heading h2{font-size:26px;letter-spacing:-.7px;color:var(--ink)}.home-community .eyebrow{margin-bottom:8px}
 .home-search,.explore-search{max-width:420px;margin:0 0 22px;width:100%}.public-search{flex:1;max-width:320px;min-width:140px}
+/* These bars are 420px wide but inherit a 120px field, which left most of the bar dead to a click.
+   The field takes the whole width instead, so anywhere in the bar lands in it. */
+.home-search input,.explore-search input,.public-search input{flex:1;width:auto;min-width:0}
 .home-folder-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .home-folder{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform .2s,box-shadow .2s,border-color .2s}.home-folder:hover{transform:translateY(-3px);box-shadow:0 12px 30px #37254c12;border-color:#d7cce4}
 .home-folder-cover{position:relative;height:96px;background:var(--cover);display:flex;align-items:center;padding:0 20px}.home-folder-cover .folder-icon{width:50px;height:50px;border-radius:13px}.home-folder-cover .visibility-badge{top:auto;bottom:12px;left:auto;right:12px;transform:none}
