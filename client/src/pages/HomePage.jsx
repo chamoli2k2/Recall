@@ -65,6 +65,9 @@ function PublicFolderCard({ folder }) {
       <div className="home-folder-meta"><span><Avatar user={folder.owner} small/> @{folder.owner?.username}</span><span>{folder.cardCount} cards · {folder.likeCount || 0} likes · {folder.copyCount || 0} copies</span></div></div>
   </Link>;
 }
+/** Three full rows of the grid. The rest of the library lives behind Explore. */
+const HOME_FOLDERS = 9;
+
 export default function HomePage() {
   const [params, setParams] = useSearchParams();
   const query = params.get('q') || '';
@@ -72,6 +75,9 @@ export default function HomePage() {
   const { data: people } = useQuery(`/users?q=${encodeURIComponent(query.trim())}`, undefined, { enabled: query.trim().length >= 2 });
   const all = data?.folders || [];
   const folders = all.filter(f => matchesFolder(f, query));
+  // A search is left whole. Hiding something somebody asked for by name reads as a missing result
+  // rather than a shortened list.
+  const visible = query ? folders : folders.slice(0, HOME_FOLDERS);
   return <div className="home">
     <section className="home-hero">
       <div className="home-hero-copy">
@@ -90,7 +96,8 @@ export default function HomePage() {
       <div className="library-section-heading"><div><span className="eyebrow">THE COMMUNITY LIBRARY</span><h2>Public collections, ready to study</h2></div><Link to="/explore" className="text-button">Explore all <ArrowRight size={15}/></Link></div>
       <form className="home-search folder-search" onSubmit={e => e.preventDefault()}><Search size={16}/><input aria-label="Search public collections and people" placeholder="Search collections or people…" value={query} onChange={e => setParams(e.target.value ? { q: e.target.value } : {})}/></form>
       {people?.users?.length > 0 && <div className="people-hits">{people.users.map(p => <Link key={p.id} className="person-chip" to={`/u/${p.username}`}><Avatar user={p} small/> {p.name} <small>@{p.username}</small></Link>)}</div>}
-      {loading ? <Loading/> : !folders.length ? query ? <Empty title="No matching collections" text="Try another word. Titles, descriptions, tags, and authors are all searchable without an account."/> : <div className="home-empty"><Globe2 size={22}/><p>No public collections yet. Be the first: create an account and publish a folder.</p></div> : <div className="home-folder-grid">{folders.map(f => <PublicFolderCard folder={f} key={f.id}/>)}</div>}
+      {loading ? <Loading/> : !folders.length ? query ? <Empty title="No matching collections" text="Try another word. Titles, descriptions, tags, and authors are all searchable without an account."/> : <div className="home-empty"><Globe2 size={22}/><p>No public collections yet. Be the first: create an account and publish a folder.</p></div> : <div className="home-folder-grid">{visible.map(f => <PublicFolderCard folder={f} key={f.id}/>)}</div>}
+      {folders.length > visible.length && <div className="home-folder-more"><Link className="button secondary" to="/explore">Explore more collections <ArrowRight size={16}/></Link></div>}
       <p className="home-community-note">Anyone can read and flip public cards. To save a collection, make a private copy, track progress, or create your own, you’ll need an account, which takes a few seconds.</p>
     </section>
     <Faq/>
