@@ -144,6 +144,9 @@ export async function demoRequest(path, options = {}) {
     error('Projects need a signed-in account outside the preview.');
   }
   if (path === '/auth/profile') { Object.assign(user, body); return { user: clone(user) }; }
+  // The sample account arrives already confirmed, so a verification link lands on a page that has
+  // nothing left to do. Saying so beats the catch-all below, which reads as a failure.
+  if (path === '/auth/verify-email') return { user: clone(user) };
   if (path.startsWith('/auth/')) error('This preview uses a sample account. Run the full app to create real accounts.');
   if (path === '/stats') return { stats: { totalCards: cards.length, due: cards.filter(c => !c.progress?.dueAt || new Date(c.progress.dueAt) <= new Date()).length, reviewed: reviews.length, reviewsToday: reviews.length, mastered: cards.filter(c => c.progress.interval >= 21).length, goal: user.dailyGoal } };
   if (entity === 'folders') {
